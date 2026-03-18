@@ -1,0 +1,673 @@
+{
+  "info": {
+    "name": "CPEN 421 - Emergency Response Platform v2",
+    "description": "Complete API collection based on actual source code — all correct field names and endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_auth", "value": "http://localhost:3001" },
+    { "key": "base_incident", "value": "http://localhost:3002" },
+    { "key": "base_tracking", "value": "http://localhost:3003" },
+    { "key": "base_analytics", "value": "http://localhost:3004" },
+    { "key": "token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "incident_id", "value": "" },
+    { "key": "unit_id", "value": "" },
+    { "key": "vehicle_id", "value": "VEH-POLICE-001" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth Service",
+      "item": [
+        {
+          "name": "Register Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.access_token) {",
+                  "  pm.collectionVariables.set('token', res.data.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', res.data.refresh_token);",
+                  "  console.log('Token saved:', res.data.access_token);",
+                  "}",
+                  "pm.test('Registration successful', () => {",
+                  "  pm.expect(res.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sammy Idana\",\n  \"email\": \"admin.new@erp.gh\",\n  \"password\": \"admin2468\",\n  \"role\": \"system_admin\"\n}"
+            },
+            "url": { "raw": "{{base_auth}}/auth/register", "host": ["{{base_auth}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.access_token) {",
+                  "  pm.collectionVariables.set('token', res.data.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', res.data.refresh_token);",
+                  "  console.log('Token saved:', res.data.access_token);",
+                  "}",
+                  "pm.test('Login successful', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin.test@erp.gh\",\n  \"password\": \"admin2468\"\n}"
+            },
+            "url": { "raw": "{{base_auth}}/auth/login", "host": ["{{base_auth}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.access_token) {",
+                  "  pm.collectionVariables.set('token', res.data.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', res.data.refresh_token);",
+                  "  console.log('Token refreshed:', res.data.access_token);",
+                  "}",
+                  "pm.test('Token refreshed', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": { "raw": "{{base_auth}}/auth/refresh-token", "host": ["{{base_auth}}"], "path": ["auth", "refresh-token"] }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_auth}}/auth/profile", "host": ["{{base_auth}}"], "path": ["auth", "profile"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Responders",
+      "item": [
+        {
+          "name": "Register Police Responder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.unit_id) {",
+                  "  pm.collectionVariables.set('unit_id', res.data.unit_id);",
+                  "  console.log('Unit ID saved:', res.data.unit_id);",
+                  "}",
+                  "pm.test('Responder registered', () => {",
+                  "  pm.expect(res.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unit_type\": \"police\",\n  \"name\": \"Accra Central Police\",\n  \"latitude\": 5.5502,\n  \"longitude\": -0.2174\n}"
+            },
+            "url": { "raw": "{{base_incident}}/responders", "host": ["{{base_incident}}"], "path": ["responders"] }
+          }
+        },
+        {
+          "name": "Register Fire Responder",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unit_type\": \"fire\",\n  \"name\": \"Accra Fire Station\",\n  \"latitude\": 5.5630,\n  \"longitude\": -0.2100\n}"
+            },
+            "url": { "raw": "{{base_incident}}/responders", "host": ["{{base_incident}}"], "path": ["responders"] }
+          }
+        },
+        {
+          "name": "Register Ambulance Responder",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unit_type\": \"ambulance\",\n  \"name\": \"Korle Bu Ambulance Unit\",\n  \"latitude\": 5.5354,\n  \"longitude\": -0.2279,\n  \"hospital_name\": \"Korle Bu Teaching Hospital\",\n  \"available_beds\": 10,\n  \"total_beds\": 20\n}"
+            },
+            "url": { "raw": "{{base_incident}}/responders", "host": ["{{base_incident}}"], "path": ["responders"] }
+          }
+        },
+        {
+          "name": "List All Responders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_incident}}/responders", "host": ["{{base_incident}}"], "path": ["responders"] }
+          }
+        },
+        {
+          "name": "List Available Police Responders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_incident}}/responders?unit_type=police&is_available=true",
+              "host": ["{{base_incident}}"],
+              "path": ["responders"],
+              "query": [
+                { "key": "unit_type", "value": "police" },
+                { "key": "is_available", "value": "true" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Nearest Responders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_incident}}/responders/nearest?lat=5.5600&lng=-0.2050&type=police&limit=3",
+              "host": ["{{base_incident}}"],
+              "path": ["responders", "nearest"],
+              "query": [
+                { "key": "lat", "value": "5.5600" },
+                { "key": "lng", "value": "-0.2050" },
+                { "key": "type", "value": "police" },
+                { "key": "limit", "value": "3" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Responder",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_available\": true,\n  \"latitude\": 5.5510,\n  \"longitude\": -0.2180\n}"
+            },
+            "url": { "raw": "{{base_incident}}/responders/{{unit_id}}", "host": ["{{base_incident}}"], "path": ["responders", "{{unit_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Incidents",
+      "item": [
+        {
+          "name": "Create Incident (Crime)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.incident_id) {",
+                  "  pm.collectionVariables.set('incident_id', res.data.incident_id);",
+                  "  console.log('Incident ID saved:', res.data.incident_id);",
+                  "}",
+                  "pm.test('Incident created', () => {",
+                  "  pm.expect(res.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"citizen_name\": \"Ama Owusu\",\n  \"citizen_phone\": \"0241234567\",\n  \"incident_type\": \"crime\",\n  \"latitude\": 5.5600,\n  \"longitude\": -0.2050,\n  \"location_address\": \"Makola Market, Accra\",\n  \"notes\": \"Armed robbery at market\"\n}"
+            },
+            "url": { "raw": "{{base_incident}}/incidents", "host": ["{{base_incident}}"], "path": ["incidents"] }
+          }
+        },
+        {
+          "name": "Create Incident (Fire)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"citizen_name\": \"Kofi Boateng\",\n  \"citizen_phone\": \"0557654321\",\n  \"incident_type\": \"fire\",\n  \"latitude\": 5.5700,\n  \"longitude\": -0.2200,\n  \"location_address\": \"Kaneshie Market, Accra\",\n  \"notes\": \"Building on fire near Kaneshie market\"\n}"
+            },
+            "url": { "raw": "{{base_incident}}/incidents", "host": ["{{base_incident}}"], "path": ["incidents"] }
+          }
+        },
+        {
+          "name": "Create Incident (Medical)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"citizen_name\": \"Abena Mensah\",\n  \"citizen_phone\": \"0209876543\",\n  \"incident_type\": \"medical\",\n  \"latitude\": 5.5450,\n  \"longitude\": -0.2150,\n  \"location_address\": \"Osu, Accra\",\n  \"notes\": \"Unconscious patient, possible cardiac arrest\"\n}"
+            },
+            "url": { "raw": "{{base_incident}}/incidents", "host": ["{{base_incident}}"], "path": ["incidents"] }
+          }
+        },
+        {
+          "name": "Create Incident (Accident)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"citizen_name\": \"Yaw Darko\",\n  \"citizen_phone\": \"0271112233\",\n  \"incident_type\": \"accident\",\n  \"latitude\": 5.5480,\n  \"longitude\": -0.1990,\n  \"location_address\": \"Ring Road, Accra\",\n  \"notes\": \"Two vehicle collision, injuries reported\"\n}"
+            },
+            "url": { "raw": "{{base_incident}}/incidents", "host": ["{{base_incident}}"], "path": ["incidents"] }
+          }
+        },
+        {
+          "name": "List All Incidents",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_incident}}/incidents", "host": ["{{base_incident}}"], "path": ["incidents"] }
+          }
+        },
+        {
+          "name": "List Incidents (Filter by Status)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_incident}}/incidents?status=dispatched&page=1&limit=10",
+              "host": ["{{base_incident}}"],
+              "path": ["incidents"],
+              "query": [
+                { "key": "status", "value": "dispatched" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Open Incidents",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_incident}}/incidents/open", "host": ["{{base_incident}}"], "path": ["incidents", "open"] }
+          }
+        },
+        {
+          "name": "Get Incident by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_incident}}/incidents/{{incident_id}}", "host": ["{{base_incident}}"], "path": ["incidents", "{{incident_id}}"] }
+          }
+        },
+        {
+          "name": "Dispatch Incident (Auto)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_incident}}/incidents/{{incident_id}}/dispatch", "host": ["{{base_incident}}"], "path": ["incidents", "{{incident_id}}", "dispatch"] }
+          }
+        },
+        {
+          "name": "Update Incident Status → in_progress",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\"\n}"
+            },
+            "url": { "raw": "{{base_incident}}/incidents/{{incident_id}}/status", "host": ["{{base_incident}}"], "path": ["incidents", "{{incident_id}}", "status"] }
+          }
+        },
+        {
+          "name": "Update Incident Status → resolved",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"resolved\"\n}"
+            },
+            "url": { "raw": "{{base_incident}}/incidents/{{incident_id}}/status", "host": ["{{base_incident}}"], "path": ["incidents", "{{incident_id}}", "status"] }
+          }
+        },
+        {
+          "name": "Assign Responder Manually",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unit_id\": \"{{unit_id}}\"\n}"
+            },
+            "url": { "raw": "{{base_incident}}/incidents/{{incident_id}}/assign", "host": ["{{base_incident}}"], "path": ["incidents", "{{incident_id}}", "assign"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Dispatch Tracking Service",
+      "item": [
+        {
+          "name": "Register Vehicle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.vehicle_id) {",
+                  "  pm.collectionVariables.set('vehicle_id', res.data.vehicle_id);",
+                  "  console.log('Vehicle ID saved:', res.data.vehicle_id);",
+                  "}",
+                  "pm.test('Vehicle registered', () => {",
+                  "  pm.expect(res.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicle_id\": \"VEH-POLICE-001\",\n  \"unit_type\": \"police\",\n  \"station_id\": \"{{unit_id}}\",\n  \"driver_name\": \"Kweku Mensah\",\n  \"driver_user_id\": \"DRV-001\",\n  \"latitude\": 5.5502,\n  \"longitude\": -0.2174\n}"
+            },
+            "url": { "raw": "{{base_tracking}}/vehicles/register", "host": ["{{base_tracking}}"], "path": ["vehicles", "register"] }
+          }
+        },
+        {
+          "name": "List All Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_tracking}}/vehicles", "host": ["{{base_tracking}}"], "path": ["vehicles"] }
+          }
+        },
+        {
+          "name": "List Vehicles (Filter by Type)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_tracking}}/vehicles?unit_type=police",
+              "host": ["{{base_tracking}}"],
+              "path": ["vehicles"],
+              "query": [{ "key": "unit_type", "value": "police" }]
+            }
+          }
+        },
+        {
+          "name": "Get Vehicle by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_tracking}}/vehicles/{{vehicle_id}}", "host": ["{{base_tracking}}"], "path": ["vehicles", "{{vehicle_id}}"] }
+          }
+        },
+        {
+          "name": "Get Vehicle Location",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_tracking}}/vehicles/{{vehicle_id}}/location", "host": ["{{base_tracking}}"], "path": ["vehicles", "{{vehicle_id}}", "location"] }
+          }
+        },
+        {
+          "name": "Update Vehicle Location (GPS)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 5.5550,\n  \"longitude\": -0.2100,\n  \"timestamp\": \"2026-03-16T17:00:00.000Z\"\n}"
+            },
+            "url": { "raw": "{{base_tracking}}/vehicles/{{vehicle_id}}/location", "host": ["{{base_tracking}}"], "path": ["vehicles", "{{vehicle_id}}", "location"] }
+          }
+        },
+        {
+          "name": "Get Vehicle Location History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_tracking}}/vehicles/{{vehicle_id}}/history?limit=20",
+              "host": ["{{base_tracking}}"],
+              "path": ["vehicles", "{{vehicle_id}}", "history"],
+              "query": [{ "key": "limit", "value": "20" }]
+            }
+          }
+        },
+        {
+          "name": "Update Vehicle Status → en_route",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"en_route\"\n}"
+            },
+            "url": { "raw": "{{base_tracking}}/vehicles/{{vehicle_id}}/status", "host": ["{{base_tracking}}"], "path": ["vehicles", "{{vehicle_id}}", "status"] }
+          }
+        },
+        {
+          "name": "Update Vehicle Status → on_scene",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"on_scene\"\n}"
+            },
+            "url": { "raw": "{{base_tracking}}/vehicles/{{vehicle_id}}/status", "host": ["{{base_tracking}}"], "path": ["vehicles", "{{vehicle_id}}", "status"] }
+          }
+        },
+        {
+          "name": "Update Vehicle Status → returning",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"returning\"\n}"
+            },
+            "url": { "raw": "{{base_tracking}}/vehicles/{{vehicle_id}}/status", "host": ["{{base_tracking}}"], "path": ["vehicles", "{{vehicle_id}}", "status"] }
+          }
+        },
+        {
+          "name": "Get Vehicle for Incident",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_tracking}}/incidents/{{incident_id}}/vehicle", "host": ["{{base_tracking}}"], "path": ["incidents", "{{incident_id}}", "vehicle"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Analytics Service",
+      "item": [
+        {
+          "name": "Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_analytics}}/analytics/dashboard-summary", "host": ["{{base_analytics}}"], "path": ["analytics", "dashboard-summary"] }
+          }
+        },
+        {
+          "name": "Response Times",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_analytics}}/analytics/response-times", "host": ["{{base_analytics}}"], "path": ["analytics", "response-times"] }
+          }
+        },
+        {
+          "name": "Response Times (Filter by Type)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_analytics}}/analytics/response-times?incident_type=crime&unit_type=police",
+              "host": ["{{base_analytics}}"],
+              "path": ["analytics", "response-times"],
+              "query": [
+                { "key": "incident_type", "value": "crime" },
+                { "key": "unit_type", "value": "police" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Incidents by Region",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_analytics}}/analytics/incidents-by-region", "host": ["{{base_analytics}}"], "path": ["analytics", "incidents-by-region"] }
+          }
+        },
+        {
+          "name": "Resource Utilization",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_analytics}}/analytics/resource-utilization", "host": ["{{base_analytics}}"], "path": ["analytics", "resource-utilization"] }
+          }
+        },
+        {
+          "name": "Hospital Capacity",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_analytics}}/analytics/hospital-capacity", "host": ["{{base_analytics}}"], "path": ["analytics", "hospital-capacity"] }
+          }
+        },
+        {
+          "name": "Top Responders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_analytics}}/analytics/top-responders", "host": ["{{base_analytics}}"], "path": ["analytics", "top-responders"] }
+          }
+        },
+        {
+          "name": "Incident Trends (Daily)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_analytics}}/analytics/incident-trends?granularity=day",
+              "host": ["{{base_analytics}}"],
+              "path": ["analytics", "incident-trends"],
+              "query": [{ "key": "granularity", "value": "day" }]
+            }
+          }
+        },
+        {
+          "name": "Incident Trends (Weekly)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_analytics}}/analytics/incident-trends?granularity=week",
+              "host": ["{{base_analytics}}"],
+              "path": ["analytics", "incident-trends"],
+              "query": [{ "key": "granularity", "value": "week" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

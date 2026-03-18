@@ -1,0 +1,172 @@
+version: '3.8'
+
+services:
+  # ─── Infrastructure ────────────────────────────────────────────
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: erp-postgres-auth
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: erp_user
+      POSTGRES_PASSWORD: erp_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U erp_user -d auth_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 1
+
+  postgres-incident:
+    image: postgres:15-alpine
+    container_name: erp-postgres-incident
+    environment:
+      POSTGRES_DB: incident_db
+      POSTGRES_USER: erp_user
+      POSTGRES_PASSWORD: erp_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-incident-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U erp_user -d incident_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 1
+
+  postgres-analytics:
+    image: postgres:15-alpine
+    container_name: erp-postgres-analytics
+    environment:
+      POSTGRES_DB: analytics_db
+      POSTGRES_USER: erp_user
+      POSTGRES_PASSWORD: erp_pass
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-analytics-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U erp_user -d analytics_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 1
+
+  mongo-tracking:
+    image: mongo:7-jammy
+    container_name: erp-mongo-tracking
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: erp_user
+      MONGO_INITDB_ROOT_PASSWORD: erp_pass
+      MONGO_INITDB_DATABASE: tracking_db
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-tracking-data:/data/db
+    healthcheck:
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 1
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: erp-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: erp_user
+      RABBITMQ_DEFAULT_PASS: erp_pass
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      interval: 15s
+      timeout: 10s
+      retries: 1
+
+  # ─── Microservices ─────────────────────────────────────────────
+  auth-service:
+    build: ./services/auth-service
+    container_name: erp-auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://erp_user:erp_pass@postgres-auth:5432/auth_db
+      JWT_SECRET: emergency_response_jwt_secret_2024
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_SECRET: emergency_response_refresh_secret_2024
+      JWT_REFRESH_EXPIRES_IN: 7d
+      NODE_ENV: development
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    restart: unless-stopped
+
+  incident-service:
+    build: ./services/incident-service
+    container_name: erp-incident-service
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://erp_user:erp_pass@postgres-incident:5432/incident_db
+      AUTH_SERVICE_URL: http://auth-service:3001
+      TRACKING_SERVICE_URL: http://tracking-service:3003
+      RABBITMQ_URL: amqp://erp_user:erp_pass@rabbitmq:5672
+      JWT_SECRET: emergency_response_jwt_secret_2024
+      NODE_ENV: development
+    depends_on:
+      postgres-incident:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: unless-stopped
+
+  tracking-service:
+    build: ./services/tracking-service
+    container_name: erp-tracking-service
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      MONGO_URI: mongodb://erp_user:erp_pass@mongo-tracking:27017/tracking_db?authSource=admin
+      RABBITMQ_URL: amqp://erp_user:erp_pass@rabbitmq:5672
+      JWT_SECRET: emergency_response_jwt_secret_2024
+      NODE_ENV: development
+    depends_on:
+      mongo-tracking:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  analytics-service:
+    build: ./services/analytics-service
+    container_name: erp-analytics-service
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgresql://erp_user:erp_pass@postgres-analytics:5432/analytics_db
+      RABBITMQ_URL: amqp://erp_user:erp_pass@rabbitmq:5672
+      JWT_SECRET: emergency_response_jwt_secret_2024
+      NODE_ENV: development
+    depends_on:
+      postgres-analytics:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-auth-data:
+  postgres-incident-data:
+  postgres-analytics-data:
+  mongo-tracking-data:
+  rabbitmq-data:
