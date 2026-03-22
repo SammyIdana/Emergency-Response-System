@@ -74,3 +74,52 @@ For a comprehensive interface list, Swagger documentation has been configured. O
 - Analytics: `http://localhost:3004/api-docs`
 
 Every private route requires an `Authorization: Bearer <token>` header, fetched via `/auth/login`.
+
+---
+
+## 🖥️ Frontend Client (Phase 3)
+
+A web-based admin interface for system administrators and service-specific administrators.
+
+- **Tech:** React, Vite, Tailwind CSS, Leaflet, Recharts, Socket.io Client
+- **Key Features:**
+  - Login with role-based authentication
+  - Incident reporting form with interactive map (OpenStreetMap/Leaflet)
+  - Dispatch status dashboard with live incident table
+  - Real-time vehicle tracking map (WebSocket-powered)
+  - Analytics dashboard (response times, incident trends, top responders)
+  - Role-specific views for Hospital, Police, and Fire admins
+
+### Running the Frontend
+```bash
+cd erp-frontend
+npm install --legacy-peer-deps
+npm run dev
+```
+Then open **http://localhost:5173** in your browser.
+
+---
+
+## 🔐 Default Credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| System Admin | admin@erp.gh | admin1234 |
+| Hospital Admin | hospital@erp.gh | hospital1234 |
+| Police Admin | police@erp.gh | police1234 |
+| Fire Admin | fire@erp.gh | fire1234 |
+
+---
+
+## 👥 Role-Based Access
+
+| Role | Incidents | Responders | Dispatch |
+|------|-----------|------------|---------|
+| system_admin | All types | All types | ✅ |
+| hospital_admin | Medical only | Ambulance only | ✅ |
+| police_admin | Crime + Accident | Police only | ✅ |
+| fire_admin | Fire only | Fire only | ✅ |
+
+---
+
+*CPEN 421 — Mobile and Web Software Design and Architecture · University of Ghana · 2026*
