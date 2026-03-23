@@ -164,6 +164,13 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  adminer:
+    image: adminer:latest
+    container_name: erp-adminer
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
 volumes:
   postgres-auth-data:
   postgres-incident-data:

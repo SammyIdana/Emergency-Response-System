@@ -34,6 +34,19 @@ Consumes asynchronous global events to generate historical metrics and systemic 
 
 ---
 
+## 🗄️ Databases Overview
+
+The system uses distributed databases based on the bounded contexts of each microservice. Here is the current layout of all available databases and their respective tables/collections:
+
+| Database Name | Engine | Microservice | Tables / Collections |
+|---------------|--------|--------------|----------------------|
+| `auth_db` | PostgreSQL | Identity & Auth | `users`, `refresh_tokens` |
+| `incident_db` | PostgreSQL | Emergency Incident | `incidents`, `responder_units` |
+| `analytics_db` | PostgreSQL | Analytics & Monitoring | `incident_analytics`, `resource_utilization`, `hospital_capacity_snapshots` |
+| `tracking_db` | MongoDB | Dispatch Tracking | `vehicles`, `locationhistories` |
+
+---
+
 ## ⚡ Inter-Service Communication
 
 To guarantee failover resilience and decoupled scaling, the system leverages loosely-coupled asynchronous events:
@@ -62,6 +75,11 @@ docker compose up --build
 - **Tracking Service & WebSockets:** `ws://localhost:3003` & `http://localhost:3003`
 - **Analytics Service:** `http://localhost:3004`
 - **RabbitMQ Management Dashboard:** `http://localhost:15672` (User: `erp_user` / Pass: `erp_pass`)
+- **Adminer (Database GUI):** `http://localhost:8080`
+  - **System**: PostgreSQL (or MongoDB for Tracking DB)
+  - **Server**: `postgres-auth`, `postgres-incident`, `postgres-analytics`, or `mongo-tracking`
+  - **User**: `erp_user` / **Pass**: `erp_pass`
+  - **Database**: `auth_db`, `incident_db`, `analytics_db`, or `tracking_db`
 
 ---
 
