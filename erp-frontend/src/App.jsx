@@ -5,7 +5,6 @@ import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 
 import ProtectedRoute from './components/ui/ProtectedRoute';
-import DarkModeToggle from './components/ui/DarkModeToggle';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 
 import { Toaster } from 'react-hot-toast';
@@ -37,7 +36,6 @@ export default function App() {
           <ErrorBoundary>
             <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#18181b', color: '#fff', border: '1px solid #27272a' } }} />
             <AnalyticsListener />
-            <DarkModeToggle />
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

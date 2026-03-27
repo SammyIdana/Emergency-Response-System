@@ -61,9 +61,9 @@ export default function LoginPage() {
 
         <div className="relative z-10 grid grid-cols-3 gap-4">
           {[
-            { label: 'Services',   value: '4'    },
-            { label: 'Regions',    value: '16'   },
-            { label: 'Uptime',     value: '99.9%'},
+            { label: 'Services', value: '3' },
+            { label: 'Regions', value: '16' },
+            { label: 'Uptime', value: '99.9%' },
           ].map(s => (
             <div key={s.label} className="bg-white/5 rounded-xl p-3 border border-white/10">
               <p className="font-display text-2xl font-bold text-orange-400">{s.value}</p>

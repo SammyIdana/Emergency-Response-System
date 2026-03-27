@@ -1,5 +1,6 @@
 import Sidebar from './Sidebar';
 import NotificationDrawer from '../ui/NotificationDrawer';
+import DarkModeToggle from '../ui/DarkModeToggle';
 import { User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -18,6 +19,7 @@ export default function AppLayout({ children }) {
             </span>
           </div>
           <div className="flex items-center gap-4">
+            <DarkModeToggle />
             <NotificationDrawer />
             <div className="flex items-center gap-3 pl-4 border-l border-zinc-800">
               <div className="text-right">
