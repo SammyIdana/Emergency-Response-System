@@ -1,7 +1,4 @@
 import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { createIncident, dispatchIncident, getIncidents, updateIncidentStatus } from '../lib/api';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -13,23 +10,8 @@ import {
   INCIDENT_TYPES, INCIDENT_STATUSES, formatRelative,
   incidentBadgeClass, getIncidentIcon
 } from '../lib/utils';
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
-
-const pinIcon = L.divIcon({
-  html: `<div style="background:#f97316;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 0 0 3px rgba(249,115,22,0.4)"></div>`,
-  className: '', iconSize: [14, 14], iconAnchor: [7, 7],
-});
-
-function LocationPicker({ onPick }) {
-  useMapEvents({ click(e) { onPick(e.latlng.lat, e.latlng.lng); } });
-  return null;
-}
+import GoogleMapComponent from '../components/ui/GoogleMapComponent';
+import LocationSearch from '../components/ui/LocationSearch';
 
 const EMPTY_FORM = {
   citizen_name: '', citizen_phone: '', incident_type: 'crime',
@@ -96,7 +78,7 @@ export default function IncidentsPage() {
 
   useEffect(() => { loadIncidents(); }, [filterStatus, filterType]);
 
-  function handleMapPick(lat, lng) {
+  function handleMapPick({ lat, lng }) {
     setPinPos({ lat, lng });
     setForm(f => ({ ...f, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }));
   }
@@ -105,8 +87,16 @@ export default function IncidentsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await createIncident({ ...form, latitude: parseFloat(form.latitude), longitude: parseFloat(form.longitude) });
-      showToast('Incident created successfully');
+      const res = await createIncident({ ...form, latitude: parseFloat(form.latitude), longitude: parseFloat(form.longitude) });
+      
+      const dispatchData = res.data.data;
+      if (dispatchData.dispatched_units && dispatchData.dispatched_units.length > 0) {
+        const unitNames = dispatchData.dispatched_units.map(u => u.name).join(', ');
+        showToast(`Success! Dispatched ${unitNames}`);
+      } else {
+        showToast('Incident created successfully');
+      }
+
       setForm({ ...EMPTY_FORM, incident_type: allowedTypes?.[0] || 'crime' });
       setPinPos(null); setShowForm(false);
       loadIncidents();
@@ -201,23 +191,29 @@ export default function IncidentsPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-4">
                   <div>
-                    <label className="label">Latitude *</label>
-                    <input className="input font-mono text-xs" required placeholder="5.5502"
-                      value={form.latitude} onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))} />
+                    <label className="label">Location in Ghana *</label>
+                    <LocationSearch 
+                      onSelect={({ lat, lng, address }) => {
+                        setForm(f => ({ ...f, latitude: lat, longitude: lng, location_address: address }));
+                        setPinPos({ lat, lng });
+                      }} 
+                    />
                   </div>
-                  <div>
-                    <label className="label">Longitude *</label>
-                    <input className="input font-mono text-xs" required placeholder="-0.2174"
-                      value={form.longitude} onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))} />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="label">Location Address</label>
-                  <input className="input" placeholder="Makola Market, Accra"
-                    value={form.location_address} onChange={e => setForm(f => ({ ...f, location_address: e.target.value }))} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label text-[10px] uppercase opacity-50">Latitude</label>
+                      <input readOnly className="input font-mono text-xs bg-zinc-900/50" 
+                        value={form.latitude} />
+                    </div>
+                    <div>
+                      <label className="label text-[10px] uppercase opacity-50">Longitude</label>
+                      <input readOnly className="input font-mono text-xs bg-zinc-900/50" 
+                        value={form.longitude} />
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -238,11 +234,12 @@ export default function IncidentsPage() {
                   Click map to set location
                 </label>
                 <div className="h-[340px] rounded-xl overflow-hidden border border-zinc-700">
-                  <MapContainer center={[5.5502, -0.2174]} zoom={12} style={{ height: '100%', width: '100%' }}>
-                    <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    <LocationPicker onPick={handleMapPick} />
-                    {pinPos && <Marker position={[pinPos.lat, pinPos.lng]} icon={pinIcon} />}
-                  </MapContainer>
+                  <GoogleMapComponent 
+                    center={pinPos || { lat: 5.5502, lng: -0.2174 }} 
+                    zoom={12} 
+                    onMapClick={handleMapPick}
+                    markers={pinPos ? [{ ...pinPos, title: "Incident Location" }] : []}
+                  />
                 </div>
                 <p className="text-xs text-zinc-600 mt-1.5">Centered on Accra, Ghana · Click anywhere to pin location</p>
               </div>

@@ -53,6 +53,7 @@ export const assignResponder  = (id, unit_id) => incidentApi.put(`/incidents/${i
 export const getResponders  = (params) => incidentApi.get('/responders', { params });
 export const createResponder= (data)   => incidentApi.post('/responders', data);
 export const updateResponder= (id, data) => incidentApi.put(`/responders/${id}`, data);
+export const deleteResponder= (id)       => incidentApi.delete(`/responders/${id}`);
 export const getNearestResponders = (params) => incidentApi.get('/responders/nearest', { params });
 
 // ── Tracking ──────────────────────────────────────────────────────

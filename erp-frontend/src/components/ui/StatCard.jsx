@@ -11,7 +11,7 @@ export default function StatCard({ label, value, sub, icon: Icon, color = 'orang
     <div className="card flex items-start gap-4">
       {Icon && (
         <div className={`p-2.5 rounded-lg border ${colors[color]}`}>
-          <Icon size={18} />
+          <Icon size={18} aria-hidden="true" />
         </div>
       )}
       <div className="flex-1 min-w-0">

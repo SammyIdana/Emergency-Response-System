@@ -135,7 +135,7 @@ router.get('/:id', authenticate, ctrl.getIncident);
  *       200:
  *         description: Status updated
  */
-router.put('/:id/status', authenticate, ctrl.updateStatus);
+router.put('/:id/status', authenticate, ctrl.updateIncidentStatus);
 
 /**
  * @swagger

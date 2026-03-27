@@ -227,7 +227,7 @@ export default function AnalyticsPage() {
                   const occ = h.total_beds > 0 ? Math.round(((h.total_beds - h.available_beds) / h.total_beds) * 100) : 0;
                   return (
                     <tr key={i} className="hover:bg-white/[0.02]">
-                      <td className="py-2.5 pr-4 text-zinc-300 font-medium">{h.hospital_name}</td>
+                      <td className="py-2.5 pr-4 text-zinc-300 font-medium" scope="row">{h.hospital_name}</td>
                       <td className="py-2.5 pr-4 text-zinc-400">{h.total_beds}</td>
                       <td className="py-2.5 pr-4 text-zinc-400">{h.available_beds}</td>
                       <td className="py-2.5 pr-4">

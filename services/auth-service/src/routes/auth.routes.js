@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/auth.controller');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
+const { body } = require('express-validator');
 
 /**
  * @swagger
@@ -36,7 +37,16 @@ const { authenticate, authorize } = require('../middleware/auth.middleware');
  *       409:
  *         description: Email already registered
  */
-router.post('/register', ctrl.register);
+router.post(
+	'/register',
+	[
+		body('name').isString().trim().notEmpty().withMessage('Name is required'),
+		body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+		body('password').isString().isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+		body('role').isIn(['system_admin', 'hospital_admin', 'police_admin', 'fire_admin', 'ambulance_driver']).withMessage('Invalid role'),
+	],
+	ctrl.register
+);
 
 /**
  * @swagger
@@ -60,7 +70,14 @@ router.post('/register', ctrl.register);
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', ctrl.login);
+router.post(
+	'/login',
+	[
+		body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+		body('password').isString().notEmpty().withMessage('Password is required'),
+	],
+	ctrl.login
+);
 
 /**
  * @swagger

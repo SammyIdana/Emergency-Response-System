@@ -1,48 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import io from 'socket.io-client';
 import { getVehicles, getOpenIncidents, TRACKING_WS_URL } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/layout/AppLayout';
 import { MapPin, Radio, Loader2, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { VEHICLE_STATUSES, formatRelative } from '../lib/utils';
-
-// ── Vehicle icons ──────────────────────────────────────────────────
-function makeVehicleIcon(type, status) {
-  const emojis = { police: '🚔', ambulance: '🚑', fire: '🚒' };
-  const emoji = emojis[type] || '🚐';
-  const isActive = ['en_route', 'on_scene'].includes(status);
-  return L.divIcon({
-    html: `
-      <div style="position:relative;display:flex;align-items:center;justify-content:center;">
-        ${isActive ? `<div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(249,115,22,0.2);animation:ping 1.5s infinite"></div>` : ''}
-        <div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">${emoji}</div>
-      </div>`,
-    className: '', iconSize: [36, 36], iconAnchor: [18, 18],
-  });
-}
-
-const incidentIcon = L.divIcon({
-  html: `<div style="background:#ef4444;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 0 0 3px rgba(239,68,68,0.35)"></div>`,
-  className: '', iconSize: [12, 12], iconAnchor: [6, 6],
-});
-
-// Add ping animation to document
-if (typeof document !== 'undefined' && !document.getElementById('ping-style')) {
-  const s = document.createElement('style');
-  s.id = 'ping-style';
-  s.textContent = `@keyframes ping{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(1.8)}}`;
-  document.head.appendChild(s);
-}
-
-function FlyTo({ target }) {
-  const map = useMap();
-  useEffect(() => {
-    if (target) map.flyTo(target, 14, { animate: true, duration: 1.2 });
-  }, [target]);
-  return null;
-}
+import GoogleMapComponent from '../components/ui/GoogleMapComponent';
 
 export default function TrackingPage() {
   const [vehicles, setVehicles]   = useState([]);
@@ -95,8 +58,15 @@ export default function TrackingPage() {
     return () => socket.disconnect();
   }, []);
 
-  const filtered = filter === 'all' ? vehicles : vehicles.filter(v => v.unit_type === filter);
-  const activeCnt = vehicles.filter(v => ['en_route', 'on_scene'].includes(v.status)).length;
+  const { isPolice, isHospital, isFire, isAdmin } = useAuth();
+  const roleFilter = isPolice ? 'police' : isHospital ? 'ambulance' : isFire ? 'fire' : 'all';
+
+  const filtered = vehicles.filter(v => {
+    if (isAdmin) return filter === 'all' ? true : v.unit_type === filter;
+    return v.unit_type === roleFilter;
+  });
+
+  const activeCnt = filtered.filter(v => ['en_route', 'on_scene'].includes(v.status)).length;
 
   return (
     <AppLayout>
@@ -134,51 +104,26 @@ export default function TrackingPage() {
                 <Loader2 className="animate-spin text-orange-500" size={28} />
               </div>
             ) : (
-              <MapContainer center={[5.5502, -0.2174]} zoom={12} style={{ height: '100%', width: '100%' }}>
-                <TileLayer
-                  attribution='&copy; OpenStreetMap'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <FlyTo target={flyTo} />
-
-                {/* Incident markers */}
-                {incidents.map(inc => (
-                  inc.latitude && inc.longitude && (
-                    <Marker key={inc.incident_id}
-                      position={[parseFloat(inc.latitude), parseFloat(inc.longitude)]}
-                      icon={incidentIcon}>
-                      <Popup>
-                        <div className="text-xs">
-                          <p className="font-bold capitalize">{inc.incident_type} Incident</p>
-                          <p className="text-zinc-400">{inc.citizen_name}</p>
-                          <p className="text-zinc-500">{inc.location_address || 'No address'}</p>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  )
-                ))}
-
-                {/* Vehicle markers */}
-                {filtered.map(v => {
-                  const lat = parseFloat(v.current_latitude || v.latitude);
-                  const lng = parseFloat(v.current_longitude || v.longitude);
-                  if (!lat || !lng) return null;
-                  return (
-                    <Marker key={v.vehicle_id}
-                      position={[lat, lng]}
-                      icon={makeVehicleIcon(v.unit_type, v.status)}>
-                      <Popup>
-                        <div className="text-xs space-y-1">
-                          <p className="font-bold">{v.vehicle_id}</p>
-                          <p className="capitalize text-zinc-400">{v.unit_type} · {v.status}</p>
-                          {v.driver_name && <p className="text-zinc-500">Driver: {v.driver_name}</p>}
-                          {v.last_updated && <p className="text-zinc-500">Updated: {formatRelative(v.last_updated)}</p>}
-                        </div>
-                      </Popup>
-                    </Marker>
-                  );
-                })}
-              </MapContainer>
+              <GoogleMapComponent 
+                center={flyTo || { lat: 5.5502, lng: -0.2174 }} 
+                zoom={13}
+                markers={[
+                  ...incidents.map(inc => ({
+                    lat: parseFloat(inc.latitude),
+                    lng: parseFloat(inc.longitude),
+                    title: `${inc.incident_type} Incident`,
+                    icon: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                  })),
+                  ...filtered.map(v => ({
+                    lat: parseFloat(v.current_latitude || v.latitude),
+                    lng: parseFloat(v.current_longitude || v.longitude),
+                    title: `${v.vehicle_id} (${v.status})`,
+                    icon: v.unit_type === 'police' ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 
+                          v.unit_type === 'ambulance' ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 
+                          'https://maps.google.com/mapfiles/ms/icons/orange-dot.png'
+                  }))
+                ]}
+              />
             )}
           </div>
           <p className="text-xs text-zinc-600 mt-1.5">
@@ -209,7 +154,7 @@ export default function TrackingPage() {
               const lng = parseFloat(v.current_longitude || v.longitude);
               return (
                 <button key={v.vehicle_id}
-                  onClick={() => lat && lng && setFlyTo([lat, lng])}
+                  onClick={() => lat && lng && setFlyTo({ lat, lng })}
                   className="card w-full text-left hover:border-orange-500/30 transition-colors py-3 px-3">
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="text-lg">{emojis[v.unit_type] || '🚐'}</span>

@@ -30,6 +30,7 @@ async function registerVehicle(req, res, next) {
             longitude: longitude || 0,
         });
 
+        logger.info(`AUDIT: Vehicle registered: vehicle_id=${vehicle.vehicle_id}, driver_user_id=${vehicle.driver_user_id}`);
         res.status(201).json({ success: true, data: vehicle });
     } catch (err) {
         next(err);
@@ -83,21 +84,33 @@ async function getVehicleLocation(req, res, next) {
     }
 }
 
-// POST /vehicles/:id/location (driver GPS update)
+// POST /vehicles/:id/location (GPS update or snap-to-base)
 async function updateVehicleLocation(req, res, next) {
     try {
-        const { latitude, longitude, timestamp } = req.body;
+        const { latitude, longitude, timestamp, status } = req.body;
         if (latitude === undefined || longitude === undefined) {
             return res.status(400).json({ success: false, message: 'latitude and longitude required' });
         }
 
-        const vehicle = await Vehicle.findOneAndUpdate(
+        const updateData = { latitude, longitude, updated_at: timestamp ? new Date(timestamp) : new Date() };
+        if (status) updateData.status = status;
+
+        let vehicle = await Vehicle.findOneAndUpdate(
             { vehicle_id: req.params.id },
-            { latitude, longitude, updated_at: timestamp ? new Date(timestamp) : new Date() },
+            updateData,
             { new: true }
         );
 
-        if (!vehicle) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+        // LOGICAL FIX: If not found by vehicle_id, try driver_user_id
+        if (!vehicle) {
+            vehicle = await Vehicle.findOneAndUpdate(
+                { driver_user_id: req.params.id },
+                updateData,
+                { new: true }
+            );
+        }
+
+        if (!vehicle) return res.status(404).json({ success: false, message: 'Vehicle or Driver not found' });
 
         // Save to location history
         await LocationHistory.create({
@@ -105,7 +118,7 @@ async function updateVehicleLocation(req, res, next) {
             incident_id: vehicle.incident_id,
             latitude,
             longitude,
-            recorded_at: timestamp ? new Date(timestamp) : new Date(),
+            recorded_at: updateData.updated_at,
         });
 
         // Publish location event
@@ -115,7 +128,8 @@ async function updateVehicleLocation(req, res, next) {
             unit_type: vehicle.unit_type,
             latitude,
             longitude,
-            timestamp: new Date().toISOString(),
+            status: vehicle.status,
+            timestamp: updateData.updated_at.toISOString(),
         };
         publish('dispatch.vehicle.location', locationPayload);
 
@@ -127,7 +141,8 @@ async function updateVehicleLocation(req, res, next) {
             }
         }
 
-        res.json({ success: true, data: { vehicle_id: vehicle.vehicle_id, latitude, longitude } });
+        logger.info(`AUDIT: Vehicle location updated: vehicle_id=${vehicle.vehicle_id}, lat=${latitude}, lng=${longitude}, status=${vehicle.status}`);
+        res.json({ success: true, data: vehicle });
     } catch (err) {
         next(err);
     }
@@ -171,6 +186,8 @@ async function updateVehicleStatus(req, res, next) {
 
         if (!vehicle) return res.status(404).json({ success: false, message: 'Vehicle not found' });
 
+        logger.info(`AUDIT: Vehicle status updated: vehicle_id=${vehicle.vehicle_id}, new_status=${status}`);
+
         // If arrived on scene, publish event
         if (status === 'on_scene') {
             publish('dispatch.vehicle.arrived', {
@@ -203,8 +220,30 @@ async function getVehicleForIncident(req, res, next) {
     }
 }
 
+// DELETE /vehicles/:id
+async function deleteVehicle(req, res, next) {
+    try {
+        const vehicle = await Vehicle.findOneAndDelete({ vehicle_id: req.params.id });
+        if (!vehicle) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+        
+        await LocationHistory.deleteMany({ vehicle_id: req.params.id });
+        
+        logger.info(`AUDIT: Vehicle deleted: vehicle_id=${req.params.id}`);
+        res.json({ success: true, message: 'Vehicle deleted successfully' });
+    } catch (err) {
+        next(err);
+    }
+}
+
 module.exports = {
-    registerVehicle, listVehicles, getVehicle, getVehicleLocation,
-    updateVehicleLocation, getVehicleHistory, updateVehicleStatus, getVehicleForIncident,
-    setIo
+    setIo,
+    registerVehicle,
+    listVehicles,
+    getVehicle,
+    getVehicleLocation,
+    updateVehicleLocation,
+    getVehicleHistory,
+    updateVehicleStatus,
+    getVehicleForIncident,
+    deleteVehicle
 };

@@ -18,19 +18,19 @@ Manages secure user registration, token generation, and role-based access contro
 Orchestrates emergency reports, geolocates incidents, and acts as the brain for dispatching the nearest responders.
 - **Tech:** Node.js, Express, PostgreSQL
 - **Database:** PostgreSQL (`incident_db`)
-- **Key Features:** Report incidents (`medical`, `fire`, `crime`, etc.), Track incident statuses, Autonomously dispatch the closest responders using the Haversine formula based on incident requirements.
+- **Key Features:** Report incidents (`medical`, `fire`, `crime`, etc.), Track incident statuses, Autonomously dispatch the closest responders using the Haversine formula based on incident requirements (e.g., medical incidents require hospitals with bed availability).
 
 ### 3. Dispatch Tracking Service
-Handles high-volume, real-time GPS synchronization and responder statuses.
+Handles high-volume, real-time GPS synchronization and responder statuses, and serves as the global notification hub.
 - **Tech:** Node.js, Express, Socket.io
 - **Database:** MongoDB (`tracking_db`), designed for fast, unstructured GPS history ingestion.
-- **Key Features:** Live WebSocket connections streams (`/tracking`), real-time vehicle location pinning, GPS historical trailing, active dispatch status syncing.
+- **Key Features:** Live WebSocket connections streams (`/tracking`), real-time vehicle location pinning, GPS historical trailing, and **Real-time In-App Notifications** for system-wide events (New Incident, Unit Dispatched, Resolved).
 
 ### 4. Analytics & Monitoring Service
 Consumes asynchronous global events to generate historical metrics and systemic performance tracking.
 - **Tech:** Node.js, Express, PostgreSQL
 - **Database:** PostgreSQL (`analytics_db`)
-- **Key Features:** Average response & resolution times, regional heat-mapping computations, hospital capacity snapshots, fleet utilization trends.
+- **Key Features:** Average response & resolution times, regional heat-mapping computations, hospital capacity snapshots, fleet utilization trends. Includes automated audit logging for all analytics access.
 
 ---
 

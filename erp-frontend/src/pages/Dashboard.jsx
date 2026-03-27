@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import AppLayout from '../components/layout/AppLayout';
 import { getDashboardSummary, getOpenIncidents } from '../lib/api';
+import ServiceHealthWidget from '../components/ui/ServiceHealthWidget';
 import { formatDuration, formatRelative, INCIDENT_STATUSES, incidentBadgeClass, getIncidentIcon } from '../lib/utils';
 import { AlertTriangle, Clock, CheckCircle, TrendingUp, RefreshCw, Activity } from 'lucide-react';
 
@@ -62,6 +63,7 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
+      <ServiceHealthWidget />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.12em', marginBottom: 4 }}>
@@ -140,7 +142,7 @@ export default function DashboardPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    {['TYPE', 'CITIZEN', 'LOCATION', 'STATUS', 'AGE'].map(h => (
+                    {['TYPE', 'CITIZEN', 'LOCATION', 'ASSIGNED', 'STATUS', 'AGE'].map(h => (
                       <th key={h} style={{ padding: '0 12px 10px 0', textAlign: 'left', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.1em', fontWeight: 400 }}>{h}</th>
                     ))}
                   </tr>
@@ -156,6 +158,14 @@ export default function DashboardPage() {
                       <td style={{ padding: '12px 12px 12px 0', fontSize: 13, color: 'var(--text-1)', fontWeight: 500 }}>{inc.citizen_name || '—'}</td>
                       <td style={{ padding: '12px 12px 12px 0', fontSize: 12, color: 'var(--text-3)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {inc.location_address || `${parseFloat(inc.latitude)?.toFixed(3)}, ${parseFloat(inc.longitude)?.toFixed(3)}`}
+                      </td>
+                      <td style={{ padding: '12px 12px 12px 0', fontSize: 12, color: 'var(--text-2)' }}>
+                        {inc.assigned_unit_id ? (
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontWeight: 600 }}>{inc.assigned_unit_id}</span>
+                            <span style={{ fontSize: 10, opacity: 0.7 }}>{inc.assigned_unit_type}</span>
+                          </div>
+                        ) : 'Pending'}
                       </td>
                       <td style={{ padding: '12px 12px 12px 0' }}>
                         <span className={INCIDENT_STATUSES[inc.status]?.badge || 'badge-zinc'}>

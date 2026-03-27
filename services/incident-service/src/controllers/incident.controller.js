@@ -20,12 +20,24 @@ async function createIncident(req, res, next) {
             return res.status(400).json({ success: false, message: 'Invalid incident type' });
         }
 
+        // Role-based validation
+        const { role } = req.user || {};
+        if (role === 'hospital_admin' && incident_type !== 'medical') {
+            return res.status(403).json({ success: false, message: 'Hospital admins can only create medical incidents' });
+        }
+        if (role === 'police_admin' && !['crime', 'accident'].includes(incident_type)) {
+            return res.status(403).json({ success: false, message: 'Police admins can only create crime or accident incidents' });
+        }
+        if (role === 'fire_admin' && incident_type !== 'fire') {
+            return res.status(403).json({ success: false, message: 'Fire admins can only create fire incidents' });
+        }
+
         const result = await pool.query(
             `INSERT INTO incidents
-         (citizen_name, citizen_phone, incident_type, latitude, longitude,
-          location_address, notes, created_by)
-       VALUES ($1,$2,$3::incident_type_enum,$4,$5,$6,$7,$8)
-       RETURNING *`,
+          (citizen_name, citizen_phone, incident_type, latitude, longitude,
+           location_address, notes, created_by)
+        VALUES ($1,$2,$3::incident_type_enum,$4,$5,$6,$7,$8)
+        RETURNING *`,
             [citizen_name, citizen_phone || null, incident_type,
                 latitude, longitude, location_address || null, notes || null, req.user.user_id]
         );
@@ -44,7 +56,14 @@ async function createIncident(req, res, next) {
             created_at: incident.created_at,
         });
 
-        res.status(201).json({ success: true, data: incident });
+        logger.info(`AUDIT: Incident created: incident_id=${incident.incident_id}, type=${incident.incident_type}, created_by=${incident.created_by}`);
+        
+        // AUTOMATION: Trigger auto-dispatch immediately
+        req.params.id = incident.incident_id;
+        return autoDispatch(req, res, next).catch(err => {
+            logger.error(`AUTO-DISPATCH ERROR: ${err.message}`);
+            if (!res.headersSent) res.status(500).json({ success: false, message: "Incident created but auto-dispatch failed" });
+        });
     } catch (err) {
         next(err);
     }
@@ -62,6 +81,16 @@ async function listIncidents(req, res, next) {
         if (incident_type) { query += ` AND incident_type = $${idx++}::incident_type_enum`; values.push(incident_type); }
         if (created_by) { query += ` AND created_by = $${idx++}`; values.push(created_by); }
 
+        // Role-based visibility
+        const { role } = req.user || {};
+        if (role === 'hospital_admin') {
+            query += " AND incident_type = 'medical'";
+        } else if (role === 'police_admin') {
+            query += " AND incident_type IN ('crime', 'accident')";
+        } else if (role === 'fire_admin') {
+            query += " AND incident_type = 'fire'";
+        }
+
         query += ` ORDER BY created_at DESC LIMIT $${idx++} OFFSET $${idx++}`;
         values.push(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
 
@@ -75,9 +104,16 @@ async function listIncidents(req, res, next) {
 // GET /incidents/open
 async function listOpenIncidents(req, res, next) {
     try {
+        const { role } = req.user || {};
+        let roleFilter = '';
+        if (role === 'hospital_admin') roleFilter = " AND incident_type = 'medical'";
+        else if (role === 'police_admin') roleFilter = " AND incident_type IN ('crime', 'accident')";
+        else if (role === 'fire_admin') roleFilter = " AND incident_type = 'fire'";
+
         const result = await pool.query(
             `SELECT * FROM incidents WHERE status IN ('created','dispatched','in_progress')
-       ORDER BY created_at ASC`
+             ${roleFilter}
+             ORDER BY created_at ASC`
         );
         res.json({ success: true, data: result.rows });
     } catch (err) {
@@ -99,7 +135,7 @@ async function getIncident(req, res, next) {
 }
 
 // PUT /incidents/:id/status
-async function updateStatus(req, res, next) {
+async function updateIncidentStatus(req, res, next) {
     try {
         const { status } = req.body;
         const validStatuses = ['created', 'dispatched', 'in_progress', 'resolved'];
@@ -135,14 +171,35 @@ async function updateStatus(req, res, next) {
             resolved_at: incident.resolved_at,
         });
 
-        // If resolved, free up the assigned unit
+        // If resolved, free up the assigned unit and snap back to base
         if (status === 'resolved' && incident.assigned_unit_id) {
-            await pool.query(
-                'UPDATE responder_units SET is_available = TRUE WHERE unit_id = $1',
+            const unitResult = await pool.query(
+                'UPDATE responder_units SET is_available = TRUE WHERE unit_id = $1 RETURNING *',
                 [incident.assigned_unit_id]
             );
+            
+            if (unitResult.rows.length) {
+                const unit = unitResult.rows[0];
+                // SNAPPING: Notify tracking-service to reset location to base
+                try {
+                    const axios = require('axios');
+                    const trackingUrl = process.env.TRACKING_SERVICE_URL || 'http://tracking-service:3003';
+                    // We can use a special internal endpoint or just update location
+                    await axios.post(`${trackingUrl}/vehicles/${unit.unit_id}/location`, {
+                        latitude: parseFloat(unit.latitude),
+                        longitude: parseFloat(unit.longitude),
+                        status: 'idle'
+                    }, {
+                        headers: { Authorization: req.headers.authorization }
+                    });
+                    logger.info(`SNAP: Vehicle ${unit.unit_id} returned to base: ${unit.latitude}, ${unit.longitude}`);
+                } catch (err) {
+                    logger.error(`SNAP ERROR: ${err.message}`);
+                }
+            }
         }
 
+        logger.info(`AUDIT: Incident status updated: incident_id=${incident.incident_id}, new_status=${incident.status}, updated_by=${req.user ? req.user.user_id : 'unknown'}`);
         res.json({ success: true, data: incident });
     } catch (err) {
         next(err);
@@ -203,6 +260,7 @@ async function assignResponder(req, res, next) {
             dispatched_at: incident.dispatched_at,
         });
 
+        logger.info(`AUDIT: Responder assigned: incident_id=${incident.incident_id}, unit_id=${unit.unit_id}, assigned_by=${req.user ? req.user.user_id : 'unknown'}`);
         res.json({ success: true, data: incident });
     } catch (err) {
         next(err);
@@ -238,16 +296,19 @@ async function autoDispatch(req, res, next) {
             });
         }
 
+        const unitsResult = await pool.query('SELECT * FROM responder_units WHERE is_available = TRUE');
         const dispatched = [];
 
         for (const type of responderTypes) {
-            const unitsResult = await pool.query(
-                'SELECT * FROM responder_units WHERE unit_type = $1::responder_type_enum AND is_available = TRUE',
-                [type]
-            );
+            let units = unitsResult.rows.filter(u => u.unit_type === type);
+
+            // Logical Fix: Filter by capacity for medical incidents
+            if (incident.incident_type === 'medical') {
+                units = units.filter(u => u.unit_type !== 'ambulance' || u.available_beds > 0);
+            }
 
             const nearest = selectNearestResponder(
-                unitsResult.rows,
+                units,
                 parseFloat(incident.latitude),
                 parseFloat(incident.longitude),
                 incident.incident_type
@@ -264,10 +325,9 @@ async function autoDispatch(req, res, next) {
         }
 
         if (!dispatched.length) {
-            return res.status(503).json({
-                success: false,
-                message: 'No available responders found for this incident'
-            });
+             const resp = { success: false, message: 'No available responders found for this incident' };
+             if (!res.headersSent) return res.status(503).json(resp);
+             return;
         }
 
         // Use first dispatched unit as primary assignment
@@ -306,18 +366,22 @@ async function autoDispatch(req, res, next) {
             dispatched_at: updatedIncident.dispatched_at,
         });
 
-        res.json({
-            success: true,
-            data: {
-                incident: updatedIncident,
-                dispatched_units: dispatched.map((d) => ({
-                    type: d.type,
-                    unit_id: d.unit.unit_id,
-                    name: d.unit.name,
-                    distance_km: d.unit.distance_km?.toFixed(2),
-                })),
-            }
-        });
+        logger.info(`AUDIT: Auto-dispatch: incident_id=${updatedIncident.incident_id}, primary_unit_id=${primary.unit_id}, dispatched_by=${req.user ? req.user.user_id : 'system'}`);
+        
+        if (!res.headersSent) {
+            res.json({
+                success: true,
+                data: {
+                    incident: updatedIncident,
+                    dispatched_units: dispatched.map((d) => ({
+                        type: d.type,
+                        unit_id: d.unit.unit_id,
+                        name: d.unit.name,
+                        distance_km: d.unit.distance_km?.toFixed(2),
+                    })),
+                }
+            });
+        }
     } catch (err) {
         next(err);
     }
@@ -342,8 +406,8 @@ async function listResponders(req, res, next) {
     }
 }
 
-// GET /responders/nearest
-async function getNearestResponders(req, res, next) {
+// GET /responders/nearby
+async function listNearbyResponders(req, res, next) {
     try {
         const { lat, lng, type, limit = 5 } = req.query;
         if (!lat || !lng || !type) {
@@ -377,30 +441,56 @@ async function registerResponder(req, res, next) {
 
         const result = await pool.query(
             `INSERT INTO responder_units
-         (unit_type, name, latitude, longitude, hospital_id, hospital_name, available_beds, total_beds)
-       VALUES ($1::responder_type_enum, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
+          (unit_type, name, latitude, longitude, hospital_id, hospital_name, available_beds, total_beds)
+        VALUES ($1::responder_type_enum, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *`,
             [unit_type, name, latitude, longitude, hospital_id || null, hospital_name || null,
                 available_beds || 0, total_beds || 0]
         );
 
-        res.status(201).json({ success: true, data: result.rows[0] });
+        const responder = result.rows[0];
+
+        // LOGICAL FIX: Automatically register as a vehicle in tracking-service
+        try {
+            const axios = require('axios');
+            const trackingUrl = process.env.TRACKING_SERVICE_URL || 'http://tracking-service:3003';
+            await axios.post(`${trackingUrl}/vehicles/register`, {
+                vehicle_id: responder.unit_id,
+                unit_type: (responder.unit_type === 'ambulance' ? 'ambulance' : (responder.unit_type === 'police' ? 'police' : 'fire')),
+                station_id: responder.hospital_id || responder.unit_id,
+                driver_name: responder.name + ' Driver',
+                driver_user_id: 'auto-driver-' + Date.now(),
+                latitude: parseFloat(responder.latitude),
+                longitude: parseFloat(responder.longitude)
+            }, {
+                headers: { Authorization: req.headers.authorization }
+            });
+            logger.info(`SYNC: Vehicle registered in tracking-service for unit: ${responder.unit_id}`);
+        } catch (err) {
+            logger.error(`SYNC ERROR: Failed to register vehicle in tracking-service: ${err.message}`);
+        }
+
+        res.status(201).json({ success: true, data: responder });
     } catch (err) {
         next(err);
     }
 }
 
-// PUT /responders/:id (update responder availability/capacity)
+// PUT /responders/:id (update responder)
 async function updateResponder(req, res, next) {
     try {
-        const { is_available, available_beds, total_beds } = req.body;
+        const { name, is_available, available_beds, total_beds, latitude, longitude, station_name } = req.body;
         const updates = [];
         const values = [];
         let idx = 1;
 
+        if (name) { updates.push(`name = $${idx++}`); values.push(name); }
         if (is_available !== undefined) { updates.push(`is_available = $${idx++}`); values.push(is_available); }
         if (available_beds !== undefined) { updates.push(`available_beds = $${idx++}`); values.push(available_beds); }
         if (total_beds !== undefined) { updates.push(`total_beds = $${idx++}`); values.push(total_beds); }
+        if (latitude !== undefined) { updates.push(`latitude = $${idx++}`); values.push(latitude); }
+        if (longitude !== undefined) { updates.push(`longitude = $${idx++}`); values.push(longitude); }
+        if (station_name) { updates.push(`hospital_name = $${idx++}`); values.push(station_name); }
 
         if (!updates.length) return res.status(400).json({ success: false, message: 'Nothing to update' });
 
@@ -412,29 +502,52 @@ async function updateResponder(req, res, next) {
             values
         );
 
-        if (!result.rows.length) return res.status(404).json({ success: false, message: 'Responder unit not found' });
+        if (!result.rows.length) return res.status(404).json({ success: false, message: 'Responder not found' });
+        
+        // If location changed and is NOT en route, tracking service would usually be updated by drivers,
+        // but for "Base location" we can optionally sync here if needed.
 
-        const unit = result.rows[0];
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err) {
+        next(err);
+    }
+}
 
-        // Publish hospital capacity update if applicable
-        if (unit.unit_type === 'ambulance' && unit.hospital_id) {
-            publish('hospital.capacity.updated', {
-                hospital_id: unit.hospital_id,
-                hospital_name: unit.hospital_name,
-                available_beds: unit.available_beds,
-                total_beds: unit.total_beds,
-                updated_at: new Date().toISOString(),
+// DELETE /responders/:id
+async function deleteResponder(req, res, next) {
+    try {
+        const result = await pool.query('DELETE FROM responder_units WHERE unit_id = $1 RETURNING *', [req.params.id]);
+        if (!result.rows.length) return res.status(404).json({ success: false, message: 'Responder not found' });
+
+        // Notify tracking-service to remove vehicle
+        try {
+            const axios = require('axios');
+            const trackingUrl = process.env.TRACKING_SERVICE_URL || 'http://tracking-service:3003';
+            await axios.delete(`${trackingUrl}/vehicles/${req.params.id}`, {
+                headers: { Authorization: req.headers.authorization }
             });
+            logger.info(`SYNC: Vehicle deleted in tracking-service for unit: ${req.params.id}`);
+        } catch (err) {
+            logger.error(`SYNC ERROR during delete: ${err.message}`);
         }
 
-        res.json({ success: true, data: unit });
+        res.json({ success: true, message: 'Responder deleted successfully' });
     } catch (err) {
         next(err);
     }
 }
 
 module.exports = {
-    createIncident, listIncidents, listOpenIncidents, getIncident,
-    updateStatus, assignResponder, autoDispatch,
-    listResponders, getNearestResponders, registerResponder, updateResponder
+    createIncident,
+    listIncidents,
+    listOpenIncidents,
+    getIncident,
+    updateIncidentStatus,
+    assignResponder,
+    autoDispatch,
+    listResponders,
+    listNearbyResponders,
+    registerResponder,
+    updateResponder,
+    deleteResponder
 };

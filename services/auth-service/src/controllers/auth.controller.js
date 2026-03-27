@@ -21,12 +21,18 @@ function hashToken(token) {
     return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+const { validationResult } = require('express-validator');
+
 // POST /auth/register
 async function register(req, res, next) {
     try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ success: false, errors: errors.array() });
+        }
         const { name, email, password, role } = req.body;
 
-        const validRoles = ['system_admin', 'hospital_admin', 'police_admin', 'fire_admin', 'ambulance_driver'];
+        const validRoles = ['system_admin', 'hospital_admin', 'police_admin', 'fire_admin', 'ambulance_driver', 'police_driver', 'fire_driver'];
         if (!validRoles.includes(role)) {
             return res.status(400).json({ success: false, message: 'Invalid role' });
         }
@@ -55,6 +61,7 @@ async function register(req, res, next) {
             [user.user_id, hashToken(refreshToken)]
         );
 
+        logger.info(`AUDIT: User registered: user_id=${user.user_id}, email=${user.email}, role=${user.role}`);
         res.status(201).json({
             success: true,
             message: 'User registered successfully',
@@ -72,6 +79,10 @@ async function register(req, res, next) {
 // POST /auth/login
 async function login(req, res, next) {
     try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ success: false, errors: errors.array() });
+        }
         const { email, password } = req.body;
 
         const result = await pool.query(
@@ -80,17 +91,20 @@ async function login(req, res, next) {
         );
 
         if (!result.rows.length) {
+            logger.warn(`AUDIT: Failed login attempt (email not found): email=${email}`);
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
         const user = result.rows[0];
 
         if (!user.is_active) {
+            logger.warn(`AUDIT: Login attempt for deactivated account: email=${email}`);
             return res.status(401).json({ success: false, message: 'Account deactivated' });
         }
 
         const valid = await bcrypt.compare(password, user.password_hash);
         if (!valid) {
+            logger.warn(`AUDIT: Failed login attempt (wrong password): email=${email}`);
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
@@ -103,6 +117,7 @@ async function login(req, res, next) {
             [user.user_id, hashToken(refreshToken)]
         );
 
+        logger.info(`AUDIT: User login: user_id=${user.user_id}, email=${user.email}`);
         res.json({
             success: true,
             message: 'Login successful',
@@ -172,6 +187,7 @@ async function logout(req, res, next) {
             const tokenHash = hashToken(refresh_token);
             await pool.query('UPDATE refresh_tokens SET revoked = TRUE WHERE token_hash = $1', [tokenHash]);
         }
+        logger.info(`AUDIT: User logout: user_id=${req.user ? req.user.user_id : 'unknown'}`);
         res.json({ success: true, message: 'Logged out successfully' });
     } catch (err) {
         next(err);
@@ -261,6 +277,7 @@ async function deactivateUser(req, res, next) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
+        logger.info(`AUDIT: User deactivated: user_id=${result.rows[0].user_id}, by=${req.user ? req.user.user_id : 'unknown'}`);
         res.json({ success: true, message: 'User deactivated', data: result.rows[0] });
     } catch (err) {
         next(err);

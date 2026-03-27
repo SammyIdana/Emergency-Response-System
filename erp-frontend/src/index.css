@@ -10,6 +10,10 @@
     @apply bg-zinc-950 text-zinc-100 font-sans antialiased;
     background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(249,115,22,0.08), transparent);
   }
+  .dark body {
+    @apply bg-zinc-900 text-zinc-100;
+    background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(251,146,60,0.10), transparent);
+  }
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { @apply bg-zinc-900; }
   ::-webkit-scrollbar-thumb { @apply bg-zinc-600 rounded-full; }
@@ -19,38 +23,67 @@
   .sidebar-link {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-all duration-150 font-medium;
   }
+  .dark .sidebar-link {
+    @apply text-zinc-300 hover:text-white hover:bg-zinc-800;
+  }
   .sidebar-link.active {
     @apply text-orange-400 bg-orange-500/10 border border-orange-500/20;
   }
-  .card { @apply bg-zinc-900 border border-zinc-800 rounded-xl p-5; }
+  .dark .sidebar-link.active {
+    @apply bg-orange-500/20 border-orange-500/40;
+  }
+  .card {
+    @apply bg-zinc-900/50 backdrop-blur-md border border-zinc-800/50 rounded-2xl p-6 transition-all duration-300;
+    box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
+  }
+  .card:hover {
+    @apply border-orange-500/20;
+    box-shadow: 0 8px 32px -1px rgba(0, 0, 0, 0.3);
+  }
+  .dark .card { @apply bg-zinc-800/50 border-zinc-700/50; }
   .btn-primary {
-    @apply bg-orange-500 hover:bg-orange-400 text-white font-semibold px-4 py-2 rounded-lg transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 justify-center;
+    @apply bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white font-bold px-6 py-2.5 rounded-xl transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 justify-center shadow-lg shadow-orange-500/20 active:scale-95;
+  }
+  .dark .btn-primary {
+    @apply from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 shadow-orange-900/20;
   }
   .btn-secondary {
-    @apply bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-medium px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-2 border border-zinc-700 justify-center;
+    @apply bg-zinc-800/80 backdrop-blur hover:bg-zinc-700/80 text-zinc-100 font-semibold px-5 py-2.5 rounded-xl transition-all duration-300 text-sm flex items-center gap-2 border border-zinc-700/50 justify-center active:scale-95;
+  }
+  .dark .btn-secondary {
+    @apply bg-zinc-700/80 hover:bg-zinc-600/80 text-zinc-100 border-zinc-600/50;
   }
   .btn-danger {
-    @apply bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-medium px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-2 justify-center;
+    @apply bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-semibold px-5 py-2.5 rounded-xl transition-all duration-300 text-sm flex items-center gap-2 justify-center active:scale-95;
+  }
+  .dark .btn-danger {
+    @apply bg-red-500/20 text-red-300 border-red-500/30;
   }
   .input {
-    @apply w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/30 transition-all;
+    @apply w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-orange-500/50 focus:ring-4 focus:ring-orange-500/10 transition-all duration-300;
   }
-  .label { @apply block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5; }
-  .badge { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold; }
-  .badge-red    { @apply badge bg-red-500/15 text-red-400 border border-red-500/25; }
-  .badge-orange { @apply badge bg-orange-500/15 text-orange-400 border border-orange-500/25; }
-  .badge-yellow { @apply badge bg-yellow-500/15 text-yellow-400 border border-yellow-500/25; }
-  .badge-green  { @apply badge bg-emerald-500/15 text-emerald-400 border border-emerald-500/25; }
-  .badge-blue   { @apply badge bg-blue-500/15 text-blue-400 border border-blue-500/25; }
-  .badge-zinc   { @apply badge bg-zinc-700/50 text-zinc-400 border border-zinc-700; }
-  .leaflet-container { background: #18181b !important; border-radius: 0.75rem; }
-  .leaflet-tile { filter: brightness(0.85) saturate(0.9); }
-  .leaflet-control-zoom a { background: #27272a !important; color: #f4f4f5 !important; border-color: #3f3f46 !important; }
-  .leaflet-popup-content-wrapper { background: #18181b !important; border: 1px solid #3f3f46 !important; color: #f4f4f5 !important; border-radius: 10px !important; }
+  .label { @apply block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2; }
+  .badge { @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider shadow-sm; }
+  .badge-red    { @apply badge bg-red-500/10 text-red-400 border border-red-500/20; }
+  .badge-orange { @apply badge bg-orange-500/10 text-orange-400 border border-orange-500/20; }
+  .badge-yellow { @apply badge bg-yellow-400/10 text-yellow-400 border border-yellow-400/20; }
+  .badge-green  { @apply badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20; }
+  .badge-blue   { @apply badge bg-blue-500/10 text-blue-400 border border-blue-500/20; }
+  .badge-zinc   { @apply badge bg-zinc-800/80 text-zinc-400 border border-zinc-700/50; }
+  .leaflet-container { background: #09090b !important; border-radius: 1.25rem; border: 1px solid #27272a !important; }
+  .leaflet-tile { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+  .leaflet-control-zoom a { background: #18181b !important; color: #a1a1aa !important; border-color: #27272a !important; }
+  .leaflet-popup-content-wrapper { background: #18181b !important; border: 1px solid #27272a !important; color: #f4f4f5 !important; border-radius: 16px !important; box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important; }
   .leaflet-popup-tip { background: #18181b !important; }
 }
 
 @layer utilities {
   .font-display { font-family: 'Syne', sans-serif; }
-  .text-gradient { @apply bg-gradient-to-r from-orange-400 to-orange-300 bg-clip-text text-transparent; }
+  .text-gradient { @apply bg-gradient-to-br from-orange-400 via-orange-300 to-amber-200 bg-clip-text text-transparent; }
+  .animate-pulse-subtle { animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
 }
