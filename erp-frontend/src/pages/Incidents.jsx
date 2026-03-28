@@ -1,45 +1,41 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { createIncident, dispatchIncident, getIncidents, updateIncidentStatus } from '../lib/api';
 import AppLayout from '../components/layout/AppLayout';
-import { useAuth } from '../context/AuthContext';
-import {
-  AlertTriangle, Plus, X, MapPin, Loader2,
-  Send, CheckCircle, Clock, Filter, RefreshCw
-} from 'lucide-react';
-import {
-  INCIDENT_TYPES, INCIDENT_STATUSES, formatRelative,
-  incidentBadgeClass, getIncidentIcon
-} from '../lib/utils';
-import GoogleMapComponent from '../components/ui/GoogleMapComponent';
-import LocationSearch from '../components/ui/LocationSearch';
+import { INCIDENT_TYPES, INCIDENT_STATUSES, formatRelative, incidentBadgeClass, getIncidentIcon } from '../lib/utils';
 
-const EMPTY_FORM = {
-  citizen_name: '', citizen_phone: '', incident_type: 'crime',
-  latitude: '', longitude: '', location_address: '', notes: '',
-};
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
-// Role → allowed incident types
-const ROLE_INCIDENT_TYPES = {
-  hospital_admin: ['medical'],
-  police_admin: ['crime', 'accident'],
-  fire_admin: ['fire'],
-  system_admin: null, // null = all
-};
+const pinIcon = L.divIcon({
+  html: `<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 0 0 3px rgba(239,68,68,0.4)"></div>`,
+  className: '', iconSize: [16, 16], iconAnchor: [8, 8],
+});
+
+function LocationPicker({ onPick }) {
+  useMapEvents({ click(e) { onPick(e.latlng.lat, e.latlng.lng); } });
+  return null;
+}
+
+const EMPTY = { citizen_name: '', citizen_phone: '', incident_type: 'crime', latitude: '', longitude: '', location_address: '', notes: '' };
+
+const IconSend = <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>;
+const IconPlus = <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>;
+const IconX = <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
+const IconRefresh = <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>;
+const IconCheck = <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>;
+const IconPin = <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+const IconSpin = <svg className="animate-spin" width="15" height="15" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity=".25" strokeWidth="4" /><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>;
 
 export default function IncidentsPage() {
-  const { user, isAdmin } = useAuth();
-
-  // Determine which incident types this role can see
-  const allowedTypes = ROLE_INCIDENT_TYPES[user?.role] || null;
-  const roleLabel = {
-    hospital_admin: '🏥 Hospital Admin — Medical incidents only',
-    police_admin: '🚔 Police Admin — Crime & Accident incidents only',
-    fire_admin: '🚒 Fire Admin — Fire incidents only',
-    system_admin: null,
-  }[user?.role];
-
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ ...EMPTY_FORM, incident_type: allowedTypes?.[0] || 'crime' });
+  const [form, setForm] = useState(EMPTY);
   const [pinPos, setPinPos] = useState(null);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,31 +50,21 @@ export default function IncidentsPage() {
     setTimeout(() => setToast(null), 3500);
   }
 
-  async function loadIncidents() {
+  async function load() {
     setLoading(true);
     try {
       const params = {};
       if (filterStatus) params.status = filterStatus;
-      // Role-based filter: if not system_admin, only show their type
-      if (allowedTypes && !filterType) {
-        params.incident_type = allowedTypes[0]; // primary type
-      } else if (filterType) {
-        params.incident_type = filterType;
-      }
+      if (filterType) params.incident_type = filterType;
       const res = await getIncidents(params);
-      let data = res.data.data?.incidents || res.data.data || [];
-      // Client-side filter for roles with multiple types (e.g. police sees crime + accident)
-      if (allowedTypes && allowedTypes.length > 1) {
-        data = data.filter(inc => allowedTypes.includes(inc.incident_type));
-      }
-      setIncidents(data);
+      setIncidents(res.data.data?.incidents || res.data.data || []);
     } catch { showToast('Failed to load incidents', 'error'); }
     setLoading(false);
   }
 
-  useEffect(() => { loadIncidents(); }, [filterStatus, filterType]);
+  useEffect(() => { load(); }, [filterStatus, filterType]);
 
-  function handleMapPick({ lat, lng }) {
+  function handleMapPick(lat, lng) {
     setPinPos({ lat, lng });
     setForm(f => ({ ...f, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }));
   }
@@ -87,19 +73,10 @@ export default function IncidentsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await createIncident({ ...form, latitude: parseFloat(form.latitude), longitude: parseFloat(form.longitude) });
-      
-      const dispatchData = res.data.data;
-      if (dispatchData.dispatched_units && dispatchData.dispatched_units.length > 0) {
-        const unitNames = dispatchData.dispatched_units.map(u => u.name).join(', ');
-        showToast(`Success! Dispatched ${unitNames}`);
-      } else {
-        showToast('Incident created successfully');
-      }
-
-      setForm({ ...EMPTY_FORM, incident_type: allowedTypes?.[0] || 'crime' });
-      setPinPos(null); setShowForm(false);
-      loadIncidents();
+      await createIncident({ ...form, latitude: parseFloat(form.latitude), longitude: parseFloat(form.longitude) });
+      showToast('Incident created successfully');
+      setForm(EMPTY); setPinPos(null); setShowForm(false);
+      load();
     } catch (err) { showToast(err.response?.data?.message || 'Failed to create incident', 'error'); }
     setSubmitting(false);
   }
@@ -109,7 +86,7 @@ export default function IncidentsPage() {
     try {
       await dispatchIncident(id);
       showToast('Dispatched nearest responder');
-      loadIncidents();
+      load();
     } catch (err) { showToast(err.response?.data?.message || 'Dispatch failed — no available responders?', 'error'); }
     setDispatching(null);
   }
@@ -118,40 +95,34 @@ export default function IncidentsPage() {
     try {
       await updateIncidentStatus(id, status);
       showToast(`Status updated to ${status}`);
-      loadIncidents();
+      load();
     } catch (err) { showToast('Update failed', 'error'); }
   }
-
-  // Filter types available in the form dropdown based on role
-  const availableIncidentTypes = allowedTypes
-    ? INCIDENT_TYPES.filter(t => allowedTypes.includes(t.value))
-    : INCIDENT_TYPES;
 
   return (
     <AppLayout>
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl border text-sm font-medium shadow-xl
-          ${toast.type === 'error'
-            ? 'bg-red-500/15 border-red-500/30 text-red-300'
-            : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'}`}>
-          {toast.msg}
-        </div>
+        <div style={{
+          position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999,
+          padding: '12px 18px', borderRadius: 10, fontSize: 14, fontWeight: 500,
+          background: toast.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+          border: `1px solid ${toast.type === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
+          color: toast.type === 'error' ? '#f87171' : '#4ade80',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        }}>{toast.msg}</div>
       )}
 
-      <div className="flex items-center justify-between mb-6">
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
-          <h1 className="font-display text-2xl font-bold text-zinc-100">Incidents</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">
-            {roleLabel || `${incidents.length} total records`}
-          </p>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>Incidents</h1>
+          <p style={{ fontSize: 14, color: 'var(--text-3)' }}>{incidents.length} total records</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={loadIncidents} className="btn-secondary">
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={load} className="btn-secondary">{IconRefresh}</button>
           <button onClick={() => setShowForm(v => !v)} className="btn-primary">
-            {showForm ? <X size={16} /> : <Plus size={16} />}
+            {showForm ? IconX : IconPlus}
             {showForm ? 'Cancel' : 'New Incident'}
           </button>
         </div>
@@ -159,15 +130,12 @@ export default function IncidentsPage() {
 
       {/* New Incident Form */}
       {showForm && (
-        <div className="card mb-6 border-orange-500/20">
-          <h2 className="font-display font-semibold text-zinc-100 mb-4 flex items-center gap-2">
-            <AlertTriangle size={16} className="text-orange-400" />
-            Report New Incident
-          </h2>
+        <div className="card" style={{ marginBottom: 28, borderColor: 'rgba(239,68,68,0.2)' }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginBottom: 20 }}>Report New Incident</h2>
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label className="label">Citizen Name *</label>
                     <input className="input" required placeholder="Ama Owusu"
@@ -179,69 +147,51 @@ export default function IncidentsPage() {
                       value={form.citizen_phone} onChange={e => setForm(f => ({ ...f, citizen_phone: e.target.value }))} />
                   </div>
                 </div>
-
                 <div>
                   <label className="label">Incident Type *</label>
-                  <select className="input" required value={form.incident_type}
-                    onChange={e => setForm(f => ({ ...f, incident_type: e.target.value }))}
-                    disabled={availableIncidentTypes.length === 1}>
-                    {availableIncidentTypes.map(t => (
-                      <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
-                    ))}
+                  <select className="input" value={form.incident_type} onChange={e => setForm(f => ({ ...f, incident_type: e.target.value }))}>
+                    {INCIDENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
                   </select>
                 </div>
-
-                <div className="space-y-4">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label className="label">Location in Ghana *</label>
-                    <LocationSearch 
-                      onSelect={({ lat, lng, address }) => {
-                        setForm(f => ({ ...f, latitude: lat, longitude: lng, location_address: address }));
-                        setPinPos({ lat, lng });
-                      }} 
-                    />
+                    <label className="label">Latitude *</label>
+                    <input className="input" required placeholder="5.5502" value={form.latitude}
+                      onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))} style={{ fontFamily: 'JetBrains Mono', fontSize: 12 }} />
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="label text-[10px] uppercase opacity-50">Latitude</label>
-                      <input readOnly className="input font-mono text-xs bg-zinc-900/50" 
-                        value={form.latitude} />
-                    </div>
-                    <div>
-                      <label className="label text-[10px] uppercase opacity-50">Longitude</label>
-                      <input readOnly className="input font-mono text-xs bg-zinc-900/50" 
-                        value={form.longitude} />
-                    </div>
+                  <div>
+                    <label className="label">Longitude *</label>
+                    <input className="input" required placeholder="-0.2174" value={form.longitude}
+                      onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))} style={{ fontFamily: 'JetBrains Mono', fontSize: 12 }} />
                   </div>
                 </div>
-
+                <div>
+                  <label className="label">Address</label>
+                  <input className="input" placeholder="Makola Market, Accra"
+                    value={form.location_address} onChange={e => setForm(f => ({ ...f, location_address: e.target.value }))} />
+                </div>
                 <div>
                   <label className="label">Notes</label>
-                  <textarea className="input min-h-[80px] resize-none" placeholder="Describe the incident..."
+                  <textarea className="input" placeholder="Describe the incident..." style={{ minHeight: 72, resize: 'none' }}
                     value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
                 </div>
-
-                <button type="submit" disabled={submitting} className="btn-primary w-full py-2.5">
-                  {submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                <button type="submit" disabled={submitting} className="btn-primary" style={{ padding: '11px 20px' }}>
+                  {submitting ? IconSpin : IconSend}
                   {submitting ? 'Creating…' : 'Create Incident'}
                 </button>
               </div>
-
               <div>
-                <label className="label flex items-center gap-1.5">
-                  <MapPin size={12} className="text-orange-400" />
-                  Click map to set location
+                <label className="label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {IconPin} Click map to pin location
                 </label>
-                <div className="h-[340px] rounded-xl overflow-hidden border border-zinc-700">
-                  <GoogleMapComponent 
-                    center={pinPos || { lat: 5.5502, lng: -0.2174 }} 
-                    zoom={12} 
-                    onMapClick={handleMapPick}
-                    markers={pinPos ? [{ ...pinPos, title: "Incident Location" }] : []}
-                  />
+                <div style={{ height: 360, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                  <MapContainer center={[5.5502, -0.2174]} zoom={12} style={{ height: '100%', width: '100%' }}>
+                    <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    <LocationPicker onPick={handleMapPick} />
+                    {pinPos && <Marker position={[pinPos.lat, pinPos.lng]} icon={pinIcon} />}
+                  </MapContainer>
                 </div>
-                <p className="text-xs text-zinc-600 mt-1.5">Centered on Accra, Ghana · Click anywhere to pin location</p>
+                <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 8 }}>Centered on Accra, Ghana</p>
               </div>
             </div>
           </form>
@@ -249,98 +199,112 @@ export default function IncidentsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-zinc-500" />
-          <select className="input w-auto text-xs py-1.5" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-            <option value="">All Statuses</option>
-            {Object.entries(INCIDENT_STATUSES).map(([v, { label }]) => (
-              <option key={v} value={v}>{label}</option>
-            ))}
-          </select>
-        </div>
-        {/* Only show type filter for system_admin */}
-        {isAdmin && (
-          <select className="input w-auto text-xs py-1.5" value={filterType} onChange={e => setFilterType(e.target.value)}>
-            <option value="">All Types</option>
-            {INCIDENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-        )}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="var(--text-3)" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+        </svg>
+        <select className="input" style={{ width: 'auto', fontSize: 13 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">All Statuses</option>
+          {Object.entries(INCIDENT_STATUSES).map(([v, { label }]) => <option key={v} value={v}>{label}</option>)}
+        </select>
+        <select className="input" style={{ width: 'auto', fontSize: 13 }} value={filterType} onChange={e => setFilterType(e.target.value)}>
+          <option value="">All Types</option>
+          {INCIDENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
       </div>
 
       {/* Table */}
-      <div className="card">
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <Loader2 className="animate-spin text-orange-500" size={24} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160 }}>
+            {IconSpin}
           </div>
         ) : incidents.length === 0 ? (
-          <div className="text-center py-16 text-zinc-600">
-            <AlertTriangle size={32} className="mx-auto mb-3 opacity-30" />
-            <p>No incidents found</p>
+          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-3)' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🚨</div>
+            <p style={{ fontSize: 15 }}>No incidents found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left border-b border-zinc-800">
-                  {['Type', 'Citizen', 'Location', 'Status', 'Reported', 'Actions'].map(h => (
-                    <th key={h} className="pb-3 pr-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider last:pr-0">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/50">
-                {incidents.map((inc) => (
-                  <tr key={inc.incident_id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-4 pr-4">
-                      <span className={`${incidentBadgeClass(inc.incident_type)} capitalize text-sm px-3 py-1`}>
-                        {getIncidentIcon(inc.incident_type)} {inc.incident_type}
-                      </span>
-                    </td>
-                    <td className="py-4 pr-4">
-                      <p className="text-zinc-200 font-semibold text-base">{inc.citizen_name}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{inc.citizen_phone}</p>
-                    </td>
-                    <td className="py-4 pr-4 max-w-[200px]">
-                      <p className="text-zinc-400 text-sm truncate">
-                        {inc.location_address || `${parseFloat(inc.latitude).toFixed(4)}, ${parseFloat(inc.longitude).toFixed(4)}`}
-                      </p>
-                    </td>
-                    <td className="py-4 pr-4">
-                      <span className={`${INCIDENT_STATUSES[inc.status]?.badge || 'badge-zinc'} text-sm px-3 py-1`}>
-                        {INCIDENT_STATUSES[inc.status]?.label || inc.status}
-                      </span>
-                    </td>
-                    <td className="py-4 pr-4 text-zinc-400 text-sm whitespace-nowrap">{formatRelative(inc.created_at)}</td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        {inc.status === 'created' && (
-                          <button onClick={() => handleDispatch(inc.incident_id)}
-                            disabled={dispatching === inc.incident_id}
-                            className="btn-primary py-1.5 px-3 text-sm">
-                            {dispatching === inc.incident_id ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                            Dispatch
-                          </button>
-                        )}
-                        {inc.status === 'dispatched' && (
-                          <button onClick={() => handleStatusChange(inc.incident_id, 'in_progress')}
-                            className="btn-secondary py-1.5 px-3 text-sm">
-                            <Clock size={13} /> In Progress
-                          </button>
-                        )}
-                        {['dispatched', 'in_progress'].includes(inc.status) && (
-                          <button onClick={() => handleStatusChange(inc.incident_id, 'resolved')}
-                            className="btn-secondary py-1.5 px-3 text-sm text-emerald-400 border-emerald-500/30">
-                            <CheckCircle size={13} /> Resolve
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+                {['Type', 'Citizen', 'Location', 'Status', 'Reported', 'Actions'].map(h => (
+                  <th key={h} style={{
+                    padding: '16px 20px', textAlign: 'left',
+                    fontSize: 12, fontWeight: 600, color: 'var(--text-3)',
+                    letterSpacing: '0.06em', textTransform: 'uppercase',
+                  }}>{h}</th>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            </thead>
+            <tbody>
+              {incidents.map((inc, i) => (
+                <tr key={inc.incident_id}
+                  style={{ borderBottom: i < incidents.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+
+                  {/* Type */}
+                  <td style={{ padding: '18px 20px' }}>
+                    <span className={`badge ${incidentBadgeClass(inc.incident_type)}`} style={{ fontSize: 13, padding: '4px 12px' }}>
+                      {getIncidentIcon(inc.incident_type)} {inc.incident_type}
+                    </span>
+                  </td>
+
+                  {/* Citizen */}
+                  <td style={{ padding: '18px 20px' }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)', marginBottom: 2 }}>{inc.citizen_name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{inc.citizen_phone}</div>
+                  </td>
+
+                  {/* Location */}
+                  <td style={{ padding: '18px 20px', maxWidth: 200 }}>
+                    <div style={{ fontSize: 14, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {inc.location_address || `${parseFloat(inc.latitude).toFixed(4)}, ${parseFloat(inc.longitude).toFixed(4)}`}
+                    </div>
+                  </td>
+
+                  {/* Status */}
+                  <td style={{ padding: '18px 20px' }}>
+                    <span className={`badge ${INCIDENT_STATUSES[inc.status]?.badge || 'badge-zinc'}`} style={{ fontSize: 13, padding: '4px 12px' }}>
+                      {INCIDENT_STATUSES[inc.status]?.label || inc.status}
+                    </span>
+                  </td>
+
+                  {/* Reported */}
+                  <td style={{ padding: '18px 20px', fontSize: 14, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                    {formatRelative(inc.created_at)}
+                  </td>
+
+                  {/* Actions */}
+                  <td style={{ padding: '18px 20px' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {inc.status === 'created' && (
+                        <button onClick={() => handleDispatch(inc.incident_id)}
+                          disabled={dispatching === inc.incident_id}
+                          className="btn-primary" style={{ padding: '7px 14px', fontSize: 13 }}>
+                          {dispatching === inc.incident_id ? IconSpin : IconSend}
+                          Dispatch
+                        </button>
+                      )}
+                      {inc.status === 'dispatched' && (
+                        <button onClick={() => handleStatusChange(inc.incident_id, 'in_progress')}
+                          className="btn-secondary" style={{ padding: '7px 14px', fontSize: 13 }}>
+                          In Progress
+                        </button>
+                      )}
+                      {['dispatched', 'in_progress'].includes(inc.status) && (
+                        <button onClick={() => handleStatusChange(inc.incident_id, 'resolved')}
+                          className="btn-secondary" style={{ padding: '7px 14px', fontSize: 13, color: '#4ade80', borderColor: 'rgba(34,197,94,0.3)' }}>
+                          {IconCheck} Resolve
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </AppLayout>
