@@ -1,0 +1,6 @@
+# Use this workspace to collaborate
+workspace:
+  id: 8beed714-25f4-45ec-80c2-131a094d996e
+localResources:
+  collections:
+    - ..\ERP_Postman_Collection_v2.json

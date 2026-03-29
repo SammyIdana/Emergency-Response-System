@@ -1,7 +1,10 @@
 require('dotenv').config();
+console.log('DATABASE_URL =', process.env.DATABASE_URL);
+
 const app = require('./app');
 const { connectDB, syncDB } = require('./db');
 const logger = require('./utils/logger');
+
 
 const PORT = process.env.PORT || 3001;
 
