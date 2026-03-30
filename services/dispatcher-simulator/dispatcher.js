@@ -5,7 +5,11 @@
 const BASE_AUTH = process.env.AUTH_SERVICE_URL || 'http://auth-service:3001';
 const BASE_INCIDENT = process.env.INCIDENT_SERVICE_URL || 'http://incident-service:3002';
 const BASE_TRACKING = process.env.TRACKING_SERVICE_URL || 'http://tracking-service:3003';
-
+// Minimal HTTP server to satisfy Render's port requirement
+const http = require('http');
+http.createServer((req, res) => res.end('Dispatcher running')).listen(process.env.PORT || 3005, () => {
+  console.log(`🌐 Health server on port ${process.env.PORT || 3005}`);
+});
 // Fallback starting positions if vehicle location not found
 const FALLBACK_START = {
   ambulance: { latitude: 5.5354, longitude: -0.2279 },

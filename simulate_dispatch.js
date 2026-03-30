@@ -121,6 +121,18 @@ async function updateVehicleLocation(vehicleId, pos) {
 
 async function resolveIncident(incidentId) {
   try {
+    // First check if already resolved
+    const checkRes = await fetch(`${BASE_INCIDENT}/incidents/${incidentId}`, {
+      headers: await getHeaders()
+    });
+    if (checkRes.ok) {
+      const checkData = await checkRes.json();
+      if (checkData.data?.status === 'resolved') {
+        console.log(`  ℹ️  Already resolved, skipping`);
+        return true;
+      }
+    }
+
     const res = await fetch(`${BASE_INCIDENT}/incidents/${incidentId}/status`, {
       method: 'PUT',
       headers: await getHeaders(),
@@ -172,9 +184,9 @@ async function simulateVehicle(vehicle, vehicleType, incidentId, incidentLat, in
   console.log(`  🏁 ON_SCENE — waiting 6 seconds...`);
   await sleep(6000);
 
-  // 5. Resolve incident
+  // 5. Resolve incident (only once)
   const resolved = await resolveIncident(incidentId);
-  console.log(resolved ? `  ✅ Incident RESOLVED` : `  ⚠️  Resolve failed`);
+  console.log(resolved ? `  ✅ Incident RESOLVED` : `  ⚠️  Already resolved`);
   await sleep(1000);
 
   // 6. Returning
