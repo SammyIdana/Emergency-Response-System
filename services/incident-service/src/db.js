@@ -64,6 +64,9 @@ async function syncDB() {
         last_synced_at TIMESTAMPTZ  DEFAULT NOW()
       );
 
+      -- Add region column if it doesn't exist
+      ALTER TABLE incidents ADD COLUMN IF NOT EXISTS region VARCHAR(100);
+
       CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
       CREATE INDEX IF NOT EXISTS idx_incidents_created_by ON incidents(created_by);
       CREATE INDEX IF NOT EXISTS idx_responders_type ON responder_units(unit_type);

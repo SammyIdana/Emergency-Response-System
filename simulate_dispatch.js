@@ -1,12 +1,10 @@
 // ── Auto Dispatch Simulator ──────────────────────────────────────
 // Run: node simulate_dispatch.js
-// Watches for dispatches, reads actual vehicle position, moves to scene, resolves, returns.
 
 const BASE_AUTH = 'http://localhost:3001';
 const BASE_INCIDENT = 'http://localhost:3002';
 const BASE_TRACKING = 'http://localhost:3003';
 
-// Fallback starting positions if vehicle location not found
 const FALLBACK_START = {
   ambulance: { latitude: 5.5354, longitude: -0.2279 },
   fire: { latitude: 5.5630, longitude: -0.2100 },
@@ -64,53 +62,35 @@ function generatePath(start, end, steps = 10) {
   return path;
 }
 
-// Get actual vehicle current position from tracking service
-async function getVehiclePosition(vehicleId, vehicleType) {
+// Find the vehicle ID in tracking service that matches the assigned unit
+async function findVehicleForUnit(unitId, vehicleType) {
   try {
-    const res = await fetch(`${BASE_TRACKING}/vehicles/${vehicleId}/location`, {
-      headers: await getHeaders()
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.data) {
-        const loc = data.data;
-        const lat = parseFloat(loc.current_latitude || loc.latitude);
-        const lng = parseFloat(loc.current_longitude || loc.longitude);
-        if (lat && lng) {
-          console.log(`  📍 Vehicle at: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-          return { latitude: lat, longitude: lng };
-        }
-      }
-    }
-  } catch (err) {
-    console.log(`  ⚠️  Could not get vehicle position, using fallback`);
-  }
-  // Use fallback
-  return FALLBACK_START[vehicleType] || FALLBACK_START.police;
-}
-
-// Find vehicle ID by unit type from tracking service
-async function findVehicleIdByType(vehicleType) {
-  try {
+    // First try: look up by unit type and find the one linked to this unit
     const res = await fetch(`${BASE_TRACKING}/vehicles?unit_type=${vehicleType}`, {
       headers: await getHeaders()
     });
     if (res.ok) {
       const data = await res.json();
       const vehicles = data.data?.vehicles || data.data || [];
-      // Find idle or available vehicle of this type
-      const available = vehicles.find(v => v.status === 'idle' || v.status === 'available') || vehicles[0];
+
+      // Try to find vehicle with matching station_id (unit_id)
+      const matched = vehicles.find(v => v.station_id === unitId);
+      if (matched) {
+        console.log(`  🚗 Matched vehicle: ${matched.vehicle_id}`);
+        return matched;
+      }
+
+      // Fallback: find any available vehicle of this type
+      const available = vehicles.find(v => v.status === 'idle') || vehicles[0];
       if (available) {
-        console.log(`  🚗 Found vehicle: ${available.vehicle_id}`);
-        return available.vehicle_id;
+        console.log(`  🚗 Using vehicle: ${available.vehicle_id}`);
+        return available;
       }
     }
   } catch (err) {
-    console.log(`  ⚠️  Could not find vehicle, using default ID`);
+    console.log(`  ⚠️  Vehicle lookup error:`, err.message);
   }
-  // Fallback to default IDs
-  const defaults = { ambulance: 'VEH-AMBULANCE-001', fire: 'VEH-FIRE-001', police: 'VEH-POLICE-001' };
-  return defaults[vehicleType] || defaults.police;
+  return null;
 }
 
 async function setVehicleStatus(vehicleId, status) {
@@ -121,9 +101,11 @@ async function setVehicleStatus(vehicleId, status) {
       body: JSON.stringify({ status })
     });
     const data = await res.json();
-    if (!data.success) console.log(`  ⚠️  Status update failed:`, data.message);
+    if (!data.success) console.log(`  ⚠️  Status failed:`, data.message);
+    return data.success;
   } catch (err) {
     console.log(`  ⚠️  Status error:`, err.message);
+    return false;
   }
 }
 
@@ -151,12 +133,19 @@ async function resolveIncident(incidentId) {
   }
 }
 
-async function simulateVehicle(vehicleId, vehicleType, incidentId, incidentLat, incidentLng) {
-  console.log(`\n🚨 [${vehicleType.toUpperCase()}] Simulating vehicle ${vehicleId}`);
+async function simulateVehicle(vehicle, vehicleType, incidentId, incidentLat, incidentLng) {
+  const vehicleId = vehicle.vehicle_id;
+  console.log(`\n🚨 [${vehicleType.toUpperCase()}] Moving ${vehicleId}`);
 
-  // Get actual current position of this specific vehicle
-  const start = await getVehiclePosition(vehicleId, vehicleType);
+  // Get starting position from vehicle data
+  const start = {
+    latitude: parseFloat(vehicle.current_latitude || vehicle.latitude || FALLBACK_START[vehicleType].latitude),
+    longitude: parseFloat(vehicle.current_longitude || vehicle.longitude || FALLBACK_START[vehicleType].longitude),
+  };
   const end = { latitude: incidentLat, longitude: incidentLng };
+
+  console.log(`  📍 Starting from: ${start.latitude.toFixed(4)}, ${start.longitude.toFixed(4)}`);
+  console.log(`  📍 Going to: ${end.latitude.toFixed(4)}, ${end.longitude.toFixed(4)}`);
 
   // 1. Dispatched
   await setVehicleStatus(vehicleId, 'dispatched');
@@ -165,17 +154,18 @@ async function simulateVehicle(vehicleId, vehicleType, incidentId, incidentLat, 
 
   // 2. En route
   await setVehicleStatus(vehicleId, 'en_route');
-  console.log(`  🚦 EN_ROUTE — moving to scene...`);
+  console.log(`  🚦 EN_ROUTE`);
   await sleep(500);
 
-  // 3. Move to incident from actual position
+  // 3. Move to incident
   const toIncident = generatePath(start, end, 10);
+  process.stdout.write('  Moving: ');
   for (let i = 0; i < toIncident.length; i++) {
     await updateVehicleLocation(vehicleId, toIncident[i]);
     process.stdout.write('📍');
     await sleep(2000);
   }
-  console.log('');
+  console.log(' arrived!');
 
   // 4. On scene
   await setVehicleStatus(vehicleId, 'on_scene');
@@ -189,17 +179,18 @@ async function simulateVehicle(vehicleId, vehicleType, incidentId, incidentLat, 
 
   // 6. Returning
   await setVehicleStatus(vehicleId, 'returning');
-  console.log(`  🚦 RETURNING TO BASE...`);
+  console.log(`  🚦 RETURNING`);
   await sleep(500);
 
-  // 7. Move back to original position
+  // 7. Move back to base
   const toBase = generatePath(end, start, 10);
+  process.stdout.write('  Returning: ');
   for (let i = 0; i < toBase.length; i++) {
     await updateVehicleLocation(vehicleId, toBase[i]);
     process.stdout.write('🏠');
     await sleep(2000);
   }
-  console.log('');
+  console.log(' home!');
 
   // 8. Idle
   await setVehicleStatus(vehicleId, 'idle');
@@ -219,16 +210,21 @@ async function checkForNewDispatches() {
       simulatedIncidents.add(inc.incident_id);
 
       const vehicleType = INCIDENT_TO_VEHICLE[inc.incident_type] || 'police';
-
       console.log(`\n🔔 New dispatch! ${inc.incident_type} → ${vehicleType}`);
+      console.log(`   Incident: ${inc.incident_id.slice(0, 8)}...`);
       console.log(`   Location: ${inc.latitude}, ${inc.longitude}`);
-      console.log(`   Assigned unit: ${inc.assigned_unit_id?.slice(0, 8) || 'unknown'}...`);
+      console.log(`   Assigned unit: ${inc.assigned_unit_id?.slice(0, 8) || 'none'}...`);
 
-      // Use the actual assigned unit ID from the incident
-      const vehicleId = inc.assigned_unit_id || await findVehicleIdByType(vehicleType);
+      // Find the actual vehicle in tracking service
+      const vehicle = await findVehicleForUnit(inc.assigned_unit_id, vehicleType);
+
+      if (!vehicle) {
+        console.log(`  ⚠️  No vehicle found for this dispatch!`);
+        continue;
+      }
 
       simulateVehicle(
-        vehicleId, vehicleType, inc.incident_id,
+        vehicle, vehicleType, inc.incident_id,
         parseFloat(inc.latitude), parseFloat(inc.longitude)
       ).catch(err => console.error('Simulation error:', err.message));
     }
