@@ -68,7 +68,7 @@ async function syncDB() {
       CREATE INDEX IF NOT EXISTS idx_incidents_created_by ON incidents(created_by);
       CREATE INDEX IF NOT EXISTS idx_responders_type ON responder_units(unit_type);
       CREATE INDEX IF NOT EXISTS idx_responders_available ON responder_units(is_available);
-      ALTER TABLE incidents ADD COLUMN IF NOT EXISTS region VARCHAR(100);
+      
     `);
     logger.info('Incident DB schema synced');
   } finally {

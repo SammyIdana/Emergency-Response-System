@@ -1,4 +1,3 @@
-const { detectGhanaRegion } = require('../utils/ghanaRegions');
 const { pool } = require('../db');
 const { publish } = require('../rabbitmq');
 const { getResponderTypeForIncident, selectNearestResponder } = require('../utils/dispatch');
@@ -33,19 +32,14 @@ async function createIncident(req, res, next) {
             return res.status(403).json({ success: false, message: 'Fire admins can only create fire incidents' });
         }
 
-        // Auto-detect Ghana region from coordinates
-        const { detectGhanaRegion } = require('../utils/ghanaRegions');
-        const region = detectGhanaRegion(latitude, longitude);
-
         const result = await pool.query(
             `INSERT INTO incidents
           (citizen_name, citizen_phone, incident_type, latitude, longitude,
-           location_address, notes, created_by, region)
-        VALUES ($1,$2,$3::incident_type_enum,$4,$5,$6,$7,$8,$9)
+           location_address, notes, created_by)
+        VALUES ($1,$2,$3::incident_type_enum,$4,$5,$6,$7,$8)
         RETURNING *`,
             [citizen_name, citizen_phone || null, incident_type,
-                latitude, longitude, location_address || null,
-                notes || null, req.user.user_id, region]
+                latitude, longitude, location_address || null, notes || null, req.user.user_id]
         );
 
         const incident = result.rows[0];
@@ -59,11 +53,10 @@ async function createIncident(req, res, next) {
             citizen_name: incident.citizen_name,
             created_by: incident.created_by,
             status: incident.status,
-            region: incident.region,
             created_at: incident.created_at,
         });
 
-        logger.info(`AUDIT: Incident created: incident_id=${incident.incident_id}, type=${incident.incident_type}, region=${region}, created_by=${incident.created_by}`);
+        logger.info(`AUDIT: Incident created: incident_id=${incident.incident_id}, type=${incident.incident_type}, created_by=${incident.created_by}`);
 
         // AUTOMATION: Trigger auto-dispatch immediately
         req.params.id = incident.incident_id;
@@ -75,7 +68,6 @@ async function createIncident(req, res, next) {
         next(err);
     }
 }
-
 
 // GET /incidents
 async function listIncidents(req, res, next) {
