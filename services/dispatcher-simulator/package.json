@@ -1,0 +1,11 @@
+{
+  "name": "dispatcher-simulator",
+  "version": "1.0.0",
+  "description": "Automatic dispatch simulator for emergency response system",
+  "main": "dispatcher.js",
+  "scripts": {
+    "start": "node dispatcher.js",
+    "dev": "nodemon dispatcher.js"
+  },
+  "dependencies": {}
+}

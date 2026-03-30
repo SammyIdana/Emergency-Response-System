@@ -450,27 +450,43 @@ async function registerResponder(req, res, next) {
 
         const responder = result.rows[0];
 
-        // LOGICAL FIX: Automatically register as a vehicle in tracking-service
-        try {
-            const axios = require('axios');
-            const trackingUrl = process.env.TRACKING_SERVICE_URL || 'http://tracking-service:3003';
-            await axios.post(`${trackingUrl}/vehicles/register`, {
-                vehicle_id: responder.unit_id,
-                unit_type: (responder.unit_type === 'ambulance' ? 'ambulance' : (responder.unit_type === 'police' ? 'police' : 'fire')),
-                station_id: responder.hospital_id || responder.unit_id,
-                driver_name: responder.name + ' Driver',
-                driver_user_id: 'auto-driver-' + Date.now(),
-                latitude: parseFloat(responder.latitude),
-                longitude: parseFloat(responder.longitude)
-            }, {
-                headers: { Authorization: req.headers.authorization }
-            });
-            logger.info(`SYNC: Vehicle registered in tracking-service for unit: ${responder.unit_id}`);
-        } catch (err) {
-            logger.error(`SYNC ERROR: Failed to register vehicle in tracking-service: ${err.message}`);
+        // LOGICAL FIX: Automatically register as a vehicle in tracking-service with retry
+        let vehicleSynced = false;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                const axios = require('axios');
+                const trackingUrl = process.env.TRACKING_SERVICE_URL || 'http://tracking-service:3003';
+                await axios.post(`${trackingUrl}/vehicles/register`, {
+                    vehicle_id: responder.unit_id,
+                    unit_type: (responder.unit_type === 'ambulance' ? 'ambulance' : (responder.unit_type === 'police' ? 'police' : 'fire')),
+                    station_id: responder.hospital_id || responder.unit_id,
+                    driver_name: responder.name + ' Driver',
+                    driver_user_id: 'auto-driver-' + responder.unit_id,
+                    latitude: parseFloat(responder.latitude),
+                    longitude: parseFloat(responder.longitude)
+                }, {
+                    headers: { Authorization: req.headers.authorization },
+                    timeout: 5000
+                });
+                vehicleSynced = true;
+                logger.info(`SYNC: Vehicle registered in tracking-service for unit: ${responder.unit_id}`);
+                break;
+            } catch (err) {
+                if (attempt === 3) {
+                    logger.error(`SYNC ERROR (final attempt): Failed to register vehicle in tracking-service: ${err.message}`);
+                } else {
+                    logger.warn(`SYNC ERROR (attempt ${attempt}/3): Retrying in 2 seconds...`);
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+            }
         }
 
-        res.status(201).json({ success: true, data: responder });
+        const responseData = {
+            ...responder,
+            vehicle_synced: vehicleSynced
+        };
+
+        res.status(201).json({ success: true, data: responseData, warning: !vehicleSynced ? 'Vehicle sync to tracking-service pending' : undefined });
     } catch (err) {
         next(err);
     }

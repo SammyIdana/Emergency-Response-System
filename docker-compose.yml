@@ -164,6 +164,23 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  dispatcher-simulator:
+    build: ./services/dispatcher-simulator
+    container_name: erp-dispatcher-simulator
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:3001
+      INCIDENT_SERVICE_URL: http://incident-service:3002
+      TRACKING_SERVICE_URL: http://tracking-service:3003
+      NODE_ENV: development
+    depends_on:
+      auth-service:
+        condition: service_started
+      incident-service:
+        condition: service_started
+      tracking-service:
+        condition: service_started
+    restart: unless-stopped
+
   adminer:
     image: adminer:latest
     container_name: erp-adminer
