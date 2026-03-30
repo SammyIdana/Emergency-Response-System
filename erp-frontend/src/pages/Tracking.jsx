@@ -73,7 +73,7 @@ export default function TrackingPage() {
     loadData();
     const token = localStorage.getItem('access_token');
     const socket = io(TRACKING_WS_URL, {
-      path: '/tracking', query: { token }, transports: ['websocket'],
+      path: '/tracking', query: { token }, transports: ['polling', 'websocket'],
     });
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
