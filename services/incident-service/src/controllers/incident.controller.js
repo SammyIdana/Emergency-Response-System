@@ -5,12 +5,12 @@ const { getResponderTypeForIncident, selectNearestResponder } = require('../util
 const logger = require('../utils/logger');
 
 // POST /incidents
-cident(req, res, next) {
+async function createIncident(req, res, next) {
     try {
         const {
             citizen_name, citizen_phone, incident_type, latitude, longitude,
             location_address, notes
-        } = req.body; async function createIn
+        } = req.body;
 
         if (!citizen_name || !incident_type || latitude === undefined || longitude === undefined) {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -75,6 +75,8 @@ cident(req, res, next) {
         next(err);
     }
 }
+
+
 // GET /incidents
 async function listIncidents(req, res, next) {
     try {
