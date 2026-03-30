@@ -2,22 +2,22 @@ const { Pool } = require('pg');
 const logger = require('./utils/logger');
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+  connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
 async function connectDB() {
-    const client = await pool.connect();
-    logger.info('Connected to PostgreSQL (Incident DB)');
-    client.release();
+  const client = await pool.connect();
+  logger.info('Connected to PostgreSQL (Incident DB)');
+  client.release();
 }
 
 async function syncDB() {
-    const client = await pool.connect();
-    try {
-        await client.query(`
+  const client = await pool.connect();
+  try {
+    await client.query(`
       CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
       DO $$ BEGIN
@@ -68,11 +68,12 @@ async function syncDB() {
       CREATE INDEX IF NOT EXISTS idx_incidents_created_by ON incidents(created_by);
       CREATE INDEX IF NOT EXISTS idx_responders_type ON responder_units(unit_type);
       CREATE INDEX IF NOT EXISTS idx_responders_available ON responder_units(is_available);
+      ALTER TABLE incidents ADD COLUMN IF NOT EXISTS region VARCHAR(100);
     `);
-        logger.info('Incident DB schema synced');
-    } finally {
-        client.release();
-    }
+    logger.info('Incident DB schema synced');
+  } finally {
+    client.release();
+  }
 }
 
 module.exports = { pool, connectDB, syncDB };

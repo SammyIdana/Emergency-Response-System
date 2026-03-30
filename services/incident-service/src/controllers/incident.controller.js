@@ -1,15 +1,16 @@
+const { detectGhanaRegion } = require('../utils/ghanaRegions');
 const { pool } = require('../db');
 const { publish } = require('../rabbitmq');
 const { getResponderTypeForIncident, selectNearestResponder } = require('../utils/dispatch');
 const logger = require('../utils/logger');
 
 // POST /incidents
-async function createIncident(req, res, next) {
+cident(req, res, next) {
     try {
         const {
             citizen_name, citizen_phone, incident_type, latitude, longitude,
             location_address, notes
-        } = req.body;
+        } = req.body; async function createIn
 
         if (!citizen_name || !incident_type || latitude === undefined || longitude === undefined) {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -32,14 +33,19 @@ async function createIncident(req, res, next) {
             return res.status(403).json({ success: false, message: 'Fire admins can only create fire incidents' });
         }
 
+        // Auto-detect Ghana region from coordinates
+        const { detectGhanaRegion } = require('../utils/ghanaRegions');
+        const region = detectGhanaRegion(latitude, longitude);
+
         const result = await pool.query(
             `INSERT INTO incidents
           (citizen_name, citizen_phone, incident_type, latitude, longitude,
-           location_address, notes, created_by)
-        VALUES ($1,$2,$3::incident_type_enum,$4,$5,$6,$7,$8)
+           location_address, notes, created_by, region)
+        VALUES ($1,$2,$3::incident_type_enum,$4,$5,$6,$7,$8,$9)
         RETURNING *`,
             [citizen_name, citizen_phone || null, incident_type,
-                latitude, longitude, location_address || null, notes || null, req.user.user_id]
+                latitude, longitude, location_address || null,
+                notes || null, req.user.user_id, region]
         );
 
         const incident = result.rows[0];
@@ -53,11 +59,12 @@ async function createIncident(req, res, next) {
             citizen_name: incident.citizen_name,
             created_by: incident.created_by,
             status: incident.status,
+            region: incident.region,
             created_at: incident.created_at,
         });
 
-        logger.info(`AUDIT: Incident created: incident_id=${incident.incident_id}, type=${incident.incident_type}, created_by=${incident.created_by}`);
-        
+        logger.info(`AUDIT: Incident created: incident_id=${incident.incident_id}, type=${incident.incident_type}, region=${region}, created_by=${incident.created_by}`);
+
         // AUTOMATION: Trigger auto-dispatch immediately
         req.params.id = incident.incident_id;
         return autoDispatch(req, res, next).catch(err => {
@@ -68,7 +75,6 @@ async function createIncident(req, res, next) {
         next(err);
     }
 }
-
 // GET /incidents
 async function listIncidents(req, res, next) {
     try {
@@ -177,7 +183,7 @@ async function updateIncidentStatus(req, res, next) {
                 'UPDATE responder_units SET is_available = TRUE WHERE unit_id = $1 RETURNING *',
                 [incident.assigned_unit_id]
             );
-            
+
             if (unitResult.rows.length) {
                 const unit = unitResult.rows[0];
                 // SNAPPING: Notify tracking-service to reset location to base
@@ -325,9 +331,9 @@ async function autoDispatch(req, res, next) {
         }
 
         if (!dispatched.length) {
-             const resp = { success: false, message: 'No available responders found for this incident' };
-             if (!res.headersSent) return res.status(503).json(resp);
-             return;
+            const resp = { success: false, message: 'No available responders found for this incident' };
+            if (!res.headersSent) return res.status(503).json(resp);
+            return;
         }
 
         // Use first dispatched unit as primary assignment
@@ -367,7 +373,7 @@ async function autoDispatch(req, res, next) {
         });
 
         logger.info(`AUDIT: Auto-dispatch: incident_id=${updatedIncident.incident_id}, primary_unit_id=${primary.unit_id}, dispatched_by=${req.user ? req.user.user_id : 'system'}`);
-        
+
         if (!res.headersSent) {
             res.json({
                 success: true,
@@ -503,7 +509,7 @@ async function updateResponder(req, res, next) {
         );
 
         if (!result.rows.length) return res.status(404).json({ success: false, message: 'Responder not found' });
-        
+
         // If location changed and is NOT en route, tracking service would usually be updated by drivers,
         // but for "Base location" we can optionally sync here if needed.
 
