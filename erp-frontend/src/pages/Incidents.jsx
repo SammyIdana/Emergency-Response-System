@@ -53,7 +53,7 @@ export default function IncidentsPage() {
   async function load() {
     setLoading(true);
     try {
-      const params = {};
+      const params = { limit: 100 };
       if (filterStatus) params.status = filterStatus;
       if (filterType) params.incident_type = filterType;
       const res = await getIncidents(params);

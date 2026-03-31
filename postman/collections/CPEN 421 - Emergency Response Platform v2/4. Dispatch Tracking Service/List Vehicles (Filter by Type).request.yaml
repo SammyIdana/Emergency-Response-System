@@ -1,0 +1,8 @@
+$kind: http-request
+url: "{{base_tracking}}/vehicles?unit_type=police"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+queryParams:
+  unit_type: police
+order: 3000

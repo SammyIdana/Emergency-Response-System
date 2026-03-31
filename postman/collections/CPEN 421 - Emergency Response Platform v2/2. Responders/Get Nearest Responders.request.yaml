@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_incident}}/responders/nearest?lat=5.5600&lng=-0.2050&type=police&l\
+  imit=3"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+queryParams:
+  lat: "5.5600"
+  lng: "-0.2050"
+  type: police
+  limit: "3"
+order: 6000

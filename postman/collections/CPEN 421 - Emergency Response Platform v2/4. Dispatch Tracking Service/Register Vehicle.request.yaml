@@ -1,0 +1,31 @@
+$kind: http-request
+url: "{{base_tracking}}/vehicles/register"
+method: POST
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "vehicle_id": "VEH-POLICE-001",
+      "unit_type": "police",
+      "station_id": "{{unit_id}}",
+      "driver_name": "Kweku Mensah",
+      "driver_user_id": "DRV-001",
+      "latitude": 5.5502,
+      "longitude": -0.2174
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.json();
+      if (res.data && res.data.vehicle_id) {
+        pm.collectionVariables.set('vehicle_id', res.data.vehicle_id);
+        console.log('Vehicle ID saved:', res.data.vehicle_id);
+      }
+      pm.test('Vehicle registered', () => {
+        pm.expect(res.success).to.be.true;
+      });
+    language: text/javascript
+order: 1000

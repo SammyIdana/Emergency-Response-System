@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{base_analytics}}/analytics/response-times?incident_type=crime&unit_type\
+  =police"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+queryParams:
+  incident_type: crime
+  unit_type: police
+order: 3000

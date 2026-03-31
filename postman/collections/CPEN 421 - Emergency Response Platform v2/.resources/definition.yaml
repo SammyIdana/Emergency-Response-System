@@ -1,0 +1,13 @@
+$kind: collection
+description: Complete API collection based on actual source code — all correct
+  field names and endpoints
+variables:
+  base_auth: http://localhost:3001
+  base_incident: http://localhost:3002
+  base_tracking: http://localhost:3003
+  base_analytics: http://localhost:3004
+  token: ""
+  refresh_token: ""
+  incident_id: ""
+  unit_id: ""
+  vehicle_id: VEH-POLICE-001

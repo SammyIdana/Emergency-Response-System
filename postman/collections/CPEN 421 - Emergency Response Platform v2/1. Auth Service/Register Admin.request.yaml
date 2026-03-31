@@ -1,0 +1,28 @@
+$kind: http-request
+url: "{{base_auth}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "name": "Sammy Idana",
+      "email": "admin.new@erp.gh",
+      "password": "admin2468",
+      "role": "system_admin"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.json();
+      if (res.data && res.data.access_token) {
+        pm.collectionVariables.set('token', res.data.access_token);
+        pm.collectionVariables.set('refresh_token', res.data.refresh_token);
+        console.log('Token saved:', res.data.access_token);
+      }
+      pm.test('Registration successful', () => {
+        pm.expect(res.success).to.be.true;
+      });
+    language: text/javascript
+order: 1000

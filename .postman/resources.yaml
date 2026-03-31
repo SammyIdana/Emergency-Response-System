@@ -1,6 +1,10 @@
 # Use this workspace to collaborate
 workspace:
   id: 8beed714-25f4-45ec-80c2-131a094d996e
+
 localResources:
   collections:
     - ..\ERP_Postman_Collection_v2.json
+cloudResources:
+  collections:
+    ..\postman\collections\CPEN 421 - Emergency Response Platform v2: 95f5e104-14cc-4ec5-92d5-e2016d826a79

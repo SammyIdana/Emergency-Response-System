@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{base_incident}}/responders"
+method: POST
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "unit_type": "ambulance",
+      "name": "Korle Bu Ambulance Unit",
+      "latitude": 5.5354,
+      "longitude": -0.2279,
+      "hospital_name": "Korle Bu Teaching Hospital",
+      "available_beds": 10,
+      "total_beds": 20
+    }
+order: 3000

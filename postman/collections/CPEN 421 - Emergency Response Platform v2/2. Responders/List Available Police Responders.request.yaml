@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_incident}}/responders?unit_type=police&is_available=true"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+queryParams:
+  unit_type: police
+  is_available: "true"
+order: 5000

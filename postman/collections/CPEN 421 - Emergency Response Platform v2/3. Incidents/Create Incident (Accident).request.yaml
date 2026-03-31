@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{base_incident}}/incidents"
+method: POST
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "citizen_name": "Yaw Darko",
+      "citizen_phone": "0271112233",
+      "incident_type": "accident",
+      "latitude": 5.5480,
+      "longitude": -0.1990,
+      "location_address": "Ring Road, Accra",
+      "notes": "Two vehicle collision, injuries reported"
+    }
+order: 4000

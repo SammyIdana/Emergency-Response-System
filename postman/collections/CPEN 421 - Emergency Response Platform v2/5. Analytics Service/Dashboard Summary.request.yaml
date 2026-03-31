@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{base_analytics}}/analytics/dashboard-summary"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+order: 1000

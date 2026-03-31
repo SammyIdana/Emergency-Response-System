@@ -1,0 +1,8 @@
+$kind: http-request
+url: "{{base_analytics}}/analytics/incident-trends?granularity=week"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+queryParams:
+  granularity: week
+order: 9000

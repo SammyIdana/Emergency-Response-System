@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{base_incident}}/responders"
+method: POST
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "unit_type": "fire",
+      "name": "Accra Fire Station",
+      "latitude": 5.5630,
+      "longitude": -0.2100
+    }
+order: 2000

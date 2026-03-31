@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{base_incident}}/incidents"
+method: POST
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "citizen_name": "Abena Mensah",
+      "citizen_phone": "0209876543",
+      "incident_type": "medical",
+      "latitude": 5.5450,
+      "longitude": -0.2150,
+      "location_address": "Osu, Accra",
+      "notes": "Unconscious patient, possible cardiac arrest"
+    }
+order: 3000

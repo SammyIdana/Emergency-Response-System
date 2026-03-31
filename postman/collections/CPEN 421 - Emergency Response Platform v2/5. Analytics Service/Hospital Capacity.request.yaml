@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{base_analytics}}/analytics/hospital-capacity"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+order: 6000

@@ -1,0 +1,8 @@
+$kind: http-request
+url: "{{base_tracking}}/vehicles/{{vehicle_id}}/history?limit=20"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+queryParams:
+  limit: "20"
+order: 7000

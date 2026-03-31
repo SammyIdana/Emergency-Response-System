@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{base_tracking}}/vehicles/{{vehicle_id}}/location"
+method: POST
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "latitude": 5.5550,
+      "longitude": -0.2100,
+      "timestamp": "2026-03-16T17:00:00.000Z"
+    }
+order: 6000

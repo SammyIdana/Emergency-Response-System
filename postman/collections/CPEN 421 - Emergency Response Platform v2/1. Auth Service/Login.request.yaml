@@ -1,0 +1,26 @@
+$kind: http-request
+url: "{{base_auth}}/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "admin.test@erp.gh",
+      "password": "admin2468"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.json();
+      if (res.data && res.data.access_token) {
+        pm.collectionVariables.set('token', res.data.access_token);
+        pm.collectionVariables.set('refresh_token', res.data.refresh_token);
+        console.log('Token saved:', res.data.access_token);
+      }
+      pm.test('Login successful', () => {
+        pm.response.to.have.status(200);
+      });
+    language: text/javascript
+order: 2000

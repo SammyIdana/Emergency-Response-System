@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{base_incident}}/incidents?status=dispatched&page=1&limit=10"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+queryParams:
+  status: dispatched
+  page: "1"
+  limit: "10"
+order: 6000

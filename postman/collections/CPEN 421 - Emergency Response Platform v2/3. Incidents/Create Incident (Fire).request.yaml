@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{base_incident}}/incidents"
+method: POST
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "citizen_name": "Kofi Boateng",
+      "citizen_phone": "0557654321",
+      "incident_type": "fire",
+      "latitude": 5.5700,
+      "longitude": -0.2200,
+      "location_address": "Kaneshie Market, Accra",
+      "notes": "Building on fire near Kaneshie market"
+    }
+order: 2000

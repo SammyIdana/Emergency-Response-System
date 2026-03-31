@@ -1,0 +1,31 @@
+$kind: http-request
+url: "{{base_incident}}/incidents"
+method: POST
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "citizen_name": "Ama Owusu",
+      "citizen_phone": "0241234567",
+      "incident_type": "crime",
+      "latitude": 5.5600,
+      "longitude": -0.2050,
+      "location_address": "Makola Market, Accra",
+      "notes": "Armed robbery at market"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.json();
+      if (res.data && res.data.incident_id) {
+        pm.collectionVariables.set('incident_id', res.data.incident_id);
+        console.log('Incident ID saved:', res.data.incident_id);
+      }
+      pm.test('Incident created', () => {
+        pm.expect(res.success).to.be.true;
+      });
+    language: text/javascript
+order: 1000

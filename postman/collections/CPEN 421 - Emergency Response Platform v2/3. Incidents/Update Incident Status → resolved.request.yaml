@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{base_incident}}/incidents/{{incident_id}}/status"
+method: PUT
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "status": "resolved"
+    }
+order: 11000

@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{base_incident}}/responders/{{unit_id}}"
+method: PUT
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "is_available": true,
+      "latitude": 5.5510,
+      "longitude": -0.2180
+    }
+order: 7000

@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{base_incident}}/incidents/{{incident_id}}"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+order: 8000
