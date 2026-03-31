@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Loader2, Save, Bed, ShieldAlert, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import AddUnitModal from '../components/ui/AddUnitModal';
-import { deleteResponder } from '../lib/api';
+import { deleteResponder, deleteVehicle } from '../lib/api';
 
 export default function HospitalAdmin() {
   const { user } = useAuth();
@@ -42,6 +42,7 @@ export default function HospitalAdmin() {
     if (!window.confirm("Are you sure you want to delete this unit? This will also remove it from live tracking.")) return;
     try {
       await deleteResponder(unitId);
+      try { await deleteVehicle(unitId); } catch (e) { console.error("Map delete sync failed", e); }
       toast.success("Unit deleted");
       setUnits(units.filter(u => u.unit_id !== unitId));
     } catch (err) {

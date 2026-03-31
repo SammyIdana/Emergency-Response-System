@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Loader2, Users, Shield, Plus, MapPin, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import AddUnitModal from '../components/ui/AddUnitModal';
-import { deleteResponder } from '../lib/api';
+import { deleteResponder, deleteVehicle } from '../lib/api';
 
 export default function PoliceAdmin() {
   const { user } = useAuth();
@@ -38,6 +38,7 @@ export default function PoliceAdmin() {
     if (!window.confirm("Delete this patrol unit?")) return;
     try {
       await deleteResponder(unitId);
+      try { await deleteVehicle(unitId); } catch (e) { console.error("Map delete sync failed", e); }
       toast.success("Unit removed");
       setUnits(units.filter(u => u.unit_id !== unitId));
     } catch (err) {

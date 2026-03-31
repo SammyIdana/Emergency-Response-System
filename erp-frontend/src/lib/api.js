@@ -65,6 +65,7 @@ export const updateVehicleLocation = (id, data) => trackingApi.post(`/vehicles/$
 export const updateVehicleStatus   = (id, status) => trackingApi.put(`/vehicles/${id}/status`, { status });
 export const getVehicleHistory     = (id, params) => trackingApi.get(`/vehicles/${id}/history`, { params });
 export const getVehicleForIncident = (incidentId) => trackingApi.get(`/incidents/${incidentId}/vehicle`);
+export const deleteVehicle         = (id)         => trackingApi.delete(`/vehicles/${id}`);
 
 // ── Analytics ─────────────────────────────────────────────────────
 export const getDashboardSummary  = ()       => analyticsApi.get('/analytics/dashboard-summary');

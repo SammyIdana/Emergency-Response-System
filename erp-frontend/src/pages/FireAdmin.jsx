@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Loader2, Flame, MapPin, Plus, Siren, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import AddUnitModal from '../components/ui/AddUnitModal';
-import { deleteResponder } from '../lib/api';
+import { deleteResponder, deleteVehicle } from '../lib/api';
 
 export default function FireAdmin() {
   const { user } = useAuth();
@@ -38,6 +38,7 @@ export default function FireAdmin() {
     if (!window.confirm("Remove this fire truck from the fleet?")) return;
     try {
       await deleteResponder(unitId);
+      try { await deleteVehicle(unitId); } catch (e) { console.error("Map delete sync failed", e); }
       toast.success("Truck removed");
       setUnits(units.filter(u => u.unit_id !== unitId));
     } catch (err) {

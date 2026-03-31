@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getResponders, createResponder, updateResponder } from '../lib/api';
+import { getResponders, createResponder, updateResponder, updateVehicleLocation } from '../lib/api';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { Shield, Plus, X, Loader2, RefreshCw, CheckCircle, XCircle, Edit2, Save } from 'lucide-react';
@@ -84,7 +84,28 @@ export default function RespondersPage() {
   }
 
   async function handleUpdate(id) {
-    try { await updateResponder(id, editData); showToast('Updated'); setEditId(null); setEditData({}); load(); }
+    try { 
+      await updateResponder(id, editData); 
+      
+      if (editData.latitude !== undefined || editData.longitude !== undefined) {
+        const target = responders.find(r => r.unit_id === id);
+        const lat = editData.latitude !== undefined ? editData.latitude : target.latitude;
+        const lng = editData.longitude !== undefined ? editData.longitude : target.longitude;
+        
+        try {
+          // Send request to tracking service map listener 
+          await updateVehicleLocation(id, { latitude: parseFloat(lat), longitude: parseFloat(lng) });
+        } catch (syncErr) {
+          console.error("Map sync failed (vehicle might not exist)", syncErr);
+          // Optional: we can display a toast for sync warning, but don't fail the whole update
+          showToast('Updated responder, but map sync warning', 'success');
+        }
+      } else {
+        showToast('Updated'); 
+      }
+      
+      setEditId(null); setEditData({}); load(); 
+    }
     catch { showToast('Update failed', 'error'); }
   }
 
