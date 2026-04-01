@@ -89,6 +89,9 @@ export default function TrackingPage() {
         v.vehicle_id === vehicle_id ? { ...v, status } : v
       ));
     });
+    socket.on('vehicle_deleted', ({ vehicle_id }) => {
+      setVehicles(prev => prev.filter(v => v.vehicle_id !== vehicle_id));
+    });
     socket.on('dispatch_created', () => loadData());
     socketRef.current = socket;
     return () => socket.disconnect();

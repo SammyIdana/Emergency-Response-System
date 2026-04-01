@@ -190,4 +190,23 @@ router.get('/:id/history', authenticate, ctrl.getVehicleHistory);
  */
 router.put('/:id/status', authenticate, ctrl.updateVehicleStatus);
 
+/**
+ * @swagger
+ * /vehicles/{id}:
+ *   delete:
+ *     summary: Delete a vehicle
+ *     tags: [Vehicles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Vehicle deleted
+ */
+router.delete('/:id', authenticate, authorize('system_admin', 'hospital_admin', 'police_admin', 'fire_admin'), ctrl.deleteVehicle);
+
 module.exports = router;

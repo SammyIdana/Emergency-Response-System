@@ -540,18 +540,6 @@ async function deleteResponder(req, res, next) {
         const result = await pool.query('DELETE FROM responder_units WHERE unit_id = $1 RETURNING *', [req.params.id]);
         if (!result.rows.length) return res.status(404).json({ success: false, message: 'Responder not found' });
 
-        // Notify tracking-service to remove vehicle
-        try {
-            const axios = require('axios');
-            const trackingUrl = process.env.TRACKING_SERVICE_URL || 'http://tracking-service:3003';
-            await axios.delete(`${trackingUrl}/vehicles/${req.params.id}`, {
-                headers: { Authorization: req.headers.authorization }
-            });
-            logger.info(`SYNC: Vehicle deleted in tracking-service for unit: ${req.params.id}`);
-        } catch (err) {
-            logger.error(`SYNC ERROR during delete: ${err.message}`);
-        }
-
         res.json({ success: true, message: 'Responder deleted successfully' });
     } catch (err) {
         next(err);

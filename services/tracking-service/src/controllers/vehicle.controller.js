@@ -229,6 +229,11 @@ async function deleteVehicle(req, res, next) {
         await LocationHistory.deleteMany({ vehicle_id: req.params.id });
         
         logger.info(`AUDIT: Vehicle deleted: vehicle_id=${req.params.id}`);
+        
+        if (ioInstance) {
+            ioInstance.emit('vehicle_deleted', { vehicle_id: req.params.id });
+        }
+        
         res.json({ success: true, message: 'Vehicle deleted successfully' });
     } catch (err) {
         next(err);
