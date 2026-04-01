@@ -12,7 +12,7 @@ const logger = require('./utils/logger');
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
@@ -30,9 +30,6 @@ app.use((err, req, res, next) => {
     res.status(err.status || 500).json({ success: false, message: err.message || 'Internal server error' });
 });
 
-/**
- * Sets up Socket.io on the provided http.Server and configures JWT auth for socket connections.
- */
 function setupSocketIo(httpServer) {
     const { Server } = require('socket.io');
     const io = new Server(httpServer, {
@@ -40,7 +37,6 @@ function setupSocketIo(httpServer) {
         path: '/tracking',
     });
 
-    // JWT authentication for socket connections
     io.use((socket, next) => {
         const token = socket.handshake.query.token || socket.handshake.auth.token;
         if (!token) return next(new Error('Authentication required'));
@@ -56,7 +52,6 @@ function setupSocketIo(httpServer) {
     io.on('connection', (socket) => {
         logger.info(`WebSocket client connected: ${socket.id} (user: ${socket.user?.email})`);
 
-        // Allow clients to join incident-specific rooms for targeted updates
         socket.on('join_incident', (incidentId) => {
             socket.join(`incident:${incidentId}`);
             logger.debug(`Socket ${socket.id} joined incident room: ${incidentId}`);
@@ -71,7 +66,6 @@ function setupSocketIo(httpServer) {
         });
     });
 
-    // Inject io into controller and rabbitmq
     setControllerIo(io);
     setRabbitIo(io);
 

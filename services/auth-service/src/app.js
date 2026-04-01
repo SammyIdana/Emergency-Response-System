@@ -11,13 +11,15 @@ const logger = require('./utils/logger');
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+    contentSecurityPolicy: false, // Required for Swagger UI to load properly
+}));
 app.use(cors());
 app.use(express.json());
 
 // Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 15 * 60 * 1000,
     max: 100,
     message: { success: false, message: 'Too many requests, please try again later.' }
 });
